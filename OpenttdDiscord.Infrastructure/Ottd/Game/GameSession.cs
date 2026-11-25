@@ -10,6 +10,7 @@ namespace OpenttdDiscord.Infrastructure.Ottd.Game;
 internal sealed class GameSession(IAdminPortClient client)
 {
     public const string LinkPrefix = "!discord-link ";
+    private const int MinimumVoteCount = 4;
     public static readonly TimeSpan VoteDuration = TimeSpan.FromMinutes(5);
 
     private readonly GameConsole console = new(client);
@@ -207,6 +208,11 @@ internal sealed class GameSession(IAdminPortClient client)
             return new GameReply("Unpause vote did not pass because no votes were cast.");
         }
 
+        if (yes + no < MinimumVoteCount)
+        {
+            return new GameReply($"Unpause vote did not pass ({yes} yes / {no} no). At least {MinimumVoteCount} votes are required.");
+        }
+
         if (yes < no)
         {
             return new GameReply($"Unpause vote did not pass ({yes} yes / {no} no).");
@@ -269,7 +275,7 @@ internal sealed class GameSession(IAdminPortClient client)
         voteId = Guid.NewGuid();
         votes.Clear();
         return new GameReply(
-            $"Unpause vote closes <t:{voteEnds.ToUnixTimeSeconds()}:R>. React with ✅ to unpause or ❌ to keep the game paused. The vote passes if at least 50% of votes cast are ✅.") { OpenedVote = voteId };
+            $"Unpause vote closes <t:{voteEnds.ToUnixTimeSeconds()}:R>. React with ✅ to unpause or ❌ to keep the game paused. At least {MinimumVoteCount} votes are required, and at least 50% must be ✅.") { OpenedVote = voteId };
     }
 
     private void ClearVote()

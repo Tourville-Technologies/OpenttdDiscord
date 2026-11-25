@@ -12,7 +12,7 @@
  };
  
  void NetworkServer_Tick(bool send_frame);
-+void NetworkDiscordKickIdleClients();
++void NetworkDiscordMoveIdleClientsToSpectators();
  void ChangeNetworkRestartTime(bool reset);
  void NetworkServerSetCompanyPassword(CompanyID company_id, std::string_view password, bool already_hashed = true);
  void NetworkServerUpdateCompanyPassworded(CompanyID company_id, bool passworded);
@@ -54,18 +54,20 @@
  	NetworkServerDoMove(this->client_id, company_id);
  	return NetworkRecvStatus::Okay;
  }
-@@ -2097,6 +2105,17 @@
+@@ -2097,6 +2105,19 @@
   * This is called every tick if this is a _network_server
   * @param send_frame Whether to send the frame to the clients.
   */
-+/** Disconnect idle players and spectators. Network acknowledgements do not count as activity. */
-+void NetworkDiscordKickIdleClients()
++/** Move idle company players to spectators. Network acknowledgements do not count as activity. */
++void NetworkDiscordMoveIdleClientsToSpectators()
 +{
 +	const auto now = std::chrono::steady_clock::now();
 +	for (NetworkClientSocket *cs : NetworkClientSocket::Iterate()) {
 +		if (cs->status != NetworkClientSocket::ClientStatus::Active) continue;
++		NetworkClientInfo *info = cs->GetInfo();
++		if (info == nullptr || !Company::IsValidID(info->client_playas)) continue;
 +		if (now - cs->last_player_activity < std::chrono::minutes(15)) continue;
-+		cs->SendError(NetworkErrorCode::Kicked, "Inactive for 15 minutes");
++		NetworkServerDoMove(info->client_id, COMPANY_SPECTATOR);
 +	}
 +}
 +
@@ -87,7 +89,7 @@
  void NetworkDisconnect(bool close_admins = true);
 --- a/src/network/network.cpp
 +++ b/src/network/network.cpp
-@@ -552,6 +552,63 @@
+@@ -552,6 +552,103 @@
  	return count;
  }
  
@@ -95,12 +97,30 @@
 +static bool discord_waiting_for_vote = true;
 +static bool discord_had_clients = false;
 +static uint64_t discord_pause_generation = 0;
++static std::chrono::steady_clock::time_point discord_low_population_since{};
++static std::chrono::steady_clock::time_point discord_low_population_warning_at{};
++
++static void NetworkDiscordResetLowPopulationTimer()
++{
++	discord_low_population_since = {};
++	discord_low_population_warning_at = {};
++}
++
++static void NetworkDiscordAnnounceToActiveClients(std::string_view message)
++{
++	for (NetworkClientSocket *cs : NetworkClientSocket::Iterate()) {
++		const NetworkClientInfo *info = cs->GetInfo();
++		if (cs->status != NetworkClientSocket::ClientStatus::Active || info == nullptr || !Company::IsValidID(info->client_playas)) continue;
++		cs->SendChat(NetworkAction::ServerMessage, ClientID::Server, false, message, {});
++	}
++}
 +
 +uint NetworkDiscordClientCount()
 +{
 +	uint count = 0;
 +	for (const NetworkClientSocket *cs : NetworkClientSocket::Iterate()) {
-+		if (cs->status == NetworkClientSocket::ClientStatus::Active) count++;
++		const NetworkClientInfo *info = cs->GetInfo();
++		if (cs->status == NetworkClientSocket::ClientStatus::Active && info != nullptr && Company::IsValidID(info->client_playas)) count++;
 +	}
 +	return count;
 +}
@@ -129,6 +149,7 @@
 +	if (other_pauses.Any()) return "blocked";
 +
 +	discord_waiting_for_vote = false;
++	NetworkDiscordResetLowPopulationTimer();
 +	CheckPauseHelper(false, PauseMode::Normal);
 +	return "resumed";
 +}
@@ -136,11 +157,32 @@
 +static void NetworkDiscordCheckPause()
 +{
 +	if (!_network_dedicated) return;
-+	NetworkDiscordKickIdleClients();
-+	const bool has_clients = NetworkDiscordClientCount() != 0;
-+	if (!has_clients) {
++	NetworkDiscordMoveIdleClientsToSpectators();
++	const auto now = std::chrono::steady_clock::now();
++	const uint active_clients = NetworkDiscordClientCount();
++	const bool has_clients = active_clients != 0;
++	if (active_clients == 0) {
 +		if (discord_had_clients) discord_pause_generation++;
 +		discord_waiting_for_vote = true;
++		NetworkDiscordResetLowPopulationTimer();
++	} else if (!discord_waiting_for_vote && active_clients >= 3) {
++		if (discord_low_population_warning_at != std::chrono::steady_clock::time_point{}) {
++			NetworkDiscordAnnounceToActiveClients("Pause countdown cancelled because a third active player connected.");
++		}
++		NetworkDiscordResetLowPopulationTimer();
++	} else if (!discord_waiting_for_vote) {
++		if (discord_low_population_since == std::chrono::steady_clock::time_point{}) discord_low_population_since = now;
++		if (discord_low_population_warning_at == std::chrono::steady_clock::time_point{} &&
++				now - discord_low_population_since >= std::chrono::minutes(15)) {
++			discord_low_population_warning_at = now;
++			NetworkDiscordAnnounceToActiveClients("Fewer than 3 active players are connected. The game will pause in 5 minutes unless another player joins a company.");
++		} else if (discord_low_population_warning_at != std::chrono::steady_clock::time_point{} &&
++				now - discord_low_population_warning_at >= std::chrono::minutes(5)) {
++			discord_pause_generation++;
++			discord_waiting_for_vote = true;
++			NetworkDiscordResetLowPopulationTimer();
++			NetworkDiscordAnnounceToActiveClients("The game is pausing because fewer than 3 active players remained connected. A Discord vote is required to resume.");
++		}
 +	}
 +	discord_had_clients = has_clients;
 +	if (discord_waiting_for_vote && !_pause_mode.Test(PauseMode::Error)) {
@@ -151,17 +193,18 @@
  /**
   * Check if the minimum number of active clients has been reached and pause or unpause the game as appropriate
   */
-@@ -1075,6 +1132,9 @@
+@@ -1075,6 +1172,10 @@
  	_record_sync_records = false;
  
  	_network_clients_connected = 0;
 +	discord_waiting_for_vote = true;
 +	discord_had_clients = false;
 +	discord_pause_generation++;
++	NetworkDiscordResetLowPopulationTimer();
  	_network_company_passworded = {};
  
  	NetworkInitGameInfo();
-@@ -1457,6 +1517,7 @@
+@@ -1457,6 +1558,7 @@
  			 * the frame_freq is more than 1 tick. Same with distributing commands. */
  			CheckPauseOnJoin();
  			CheckMinActiveClients();

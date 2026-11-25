@@ -39,7 +39,7 @@ Register the dedicated server with `/register-ottd-server` using its encrypted a
 | `/game link` | Gives you a private, one-use code to enter in OpenTTD's **All** chat. |
 | `/game my-profit` | Graphs the companies your linked OpenTTD clients are currently playing in. Run `/game link` again when you reconnect. |
 | `/game reset-password` | Clears the password for the company your linked OpenTTD client currently plays in. Specify `company` if your linked clients play in multiple companies. Set a new password in OpenTTD. |
-| `/game unpause` | Opens a five-minute vote after at least one player joins the paused game. React to the vote message with ✅ or ❌; your latest reaction is your ballot. The vote passes if at least 50% of votes cast are ✅ when the poll closes. |
+| `/game unpause` | Opens a five-minute vote after at least one player joins the paused game. React to the vote message with ✅ or ❌; your latest reaction is your ballot. At least four users must vote, and at least 50% of votes cast must be ✅. |
 | `/game-admin start`, `stop`, `restart` | Runs the configured service command on the bot host. |
 | `/game-admin admin-role` | Allows the selected Discord role to run `/game-admin` commands. Discord Administrators can always use them. |
 | `/game-admin ping-role` | Saves the Discord role to ping once when a vote opens for this server. Omit `role` to clear it. |
@@ -59,7 +59,7 @@ cmake -S . -B build-discord -DOPTION_DEDICATED=ON
 cmake --build build-discord --parallel
 ```
 
-Set `min_active_clients = 0` in the server's `[network]` configuration so the Discord vote controls resuming after the server empties. Both `pause_on_join = true` and `pause_on_join = false` are supported. With pause-on-join enabled, an approved Discord vote removes the bot's pause while OpenTTD keeps the game paused until connecting clients finish joining. The patched server disconnects players and spectators after 15 minutes without an in-game command, chat message, or company move. Camera movement and network keepalives do not count as activity. The game pauses when the last player leaves, including after an AFK disconnect, and players can join while it is paused. Basic status and public chat also work with servers that do not have the patch.
+Set `min_active_clients = 0` in the server's `[network]` configuration so the Discord vote controls resuming after the server empties. Both `pause_on_join = true` and `pause_on_join = false` are supported. With pause-on-join enabled, an approved Discord vote removes the bot's pause while OpenTTD keeps the game paused until connecting clients finish joining. After 15 minutes without an in-game command, chat message, or company move, the patched server moves an inactive company player to spectators without disconnecting them. Spectators do not keep the game running. Camera movement and network keepalives do not count as activity. Zero active company players pauses the game immediately. With only one or two active company players, the server waits 15 minutes, announces a five-minute warning in-game, and pauses if a third active player does not join; reaching three cancels and resets the countdown. Either pause requires the normal Discord vote to resume. Basic status and public chat also work with servers that do not have the patch.
 
 ### Start, stop, and restart configuration
 

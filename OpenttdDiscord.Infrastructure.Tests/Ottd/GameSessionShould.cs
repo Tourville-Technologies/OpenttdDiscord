@@ -46,6 +46,7 @@ public class GameSessionShould
         session.RecordVote(open.OpenedVote.Value, 1, false);
         session.RecordVote(open.OpenedVote.Value, 2, false);
         session.RecordVote(open.OpenedVote.Value, 3, true);
+        session.RecordVote(open.OpenedVote.Value, 4, false);
 
         var result = await session.FinishVote(open.OpenedVote!.Value);
 
@@ -54,15 +55,21 @@ public class GameSessionShould
     }
 
     [Theory]
-    [InlineData(0)]
-    [InlineData(1)]
-    public async Task ResumeWhenAtLeastHalfOfVotesAreYes(int noVotes)
+    [InlineData(4, 0)]
+    [InlineData(3, 1)]
+    [InlineData(2, 2)]
+    public async Task ResumeWhenAtLeastFourVoteAndAtLeastHalfAreYes(int yesVotes, int noVotes)
     {
         var open = await session.Execute(Vote(1));
-        session.RecordVote(open.OpenedVote!.Value, 1, true);
+        ulong userId = 1;
+        for (int index = 0; index < yesVotes; index++)
+        {
+            session.RecordVote(open.OpenedVote!.Value, userId++, true);
+        }
+
         for (int index = 0; index < noVotes; index++)
         {
-            session.RecordVote(open.OpenedVote.Value, (ulong)index + 2, false);
+            session.RecordVote(open.OpenedVote!.Value, userId++, false);
         }
 
         Assert.Equal(0, resumes);
@@ -70,6 +77,20 @@ public class GameSessionShould
 
         Assert.Contains("Vote passed", result!.Text);
         Assert.Equal(1, resumes);
+    }
+
+    [Fact]
+    public async Task KeepTheGamePausedWhenFewerThanFourUsersVote()
+    {
+        var open = await session.Execute(Vote(1));
+        session.RecordVote(open.OpenedVote!.Value, 1, true);
+        session.RecordVote(open.OpenedVote.Value, 2, true);
+        session.RecordVote(open.OpenedVote.Value, 3, true);
+
+        var result = await session.FinishVote(open.OpenedVote.Value);
+
+        Assert.Contains("At least 4 votes are required", result!.Text);
+        Assert.Equal(0, resumes);
     }
 
     [Fact]
@@ -105,6 +126,8 @@ public class GameSessionShould
         var open = await session.Execute(Vote(1));
         session.RecordVote(open.OpenedVote!.Value, 1, true);
         session.RecordVote(open.OpenedVote.Value, 2, true);
+        session.RecordVote(open.OpenedVote.Value, 3, true);
+        session.RecordVote(open.OpenedVote.Value, 4, true);
         generation++;
 
         var result = await session.FinishVote(open.OpenedVote!.Value);
