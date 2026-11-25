@@ -30,7 +30,6 @@ namespace OpenttdDiscord.Infrastructure.Tests.Reporting.Runners
         public async Task NotExecuteForNonAdmin(UserLevel userLevel)
         {
             var result = await WithGuildUser()
-                .WithOption("server-name", "whatever")
                 .WithUserLevel(userLevel)
                 .RunExt(sut);
 

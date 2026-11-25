@@ -29,16 +29,13 @@ namespace OpenttdDiscord.Infrastructure.Servers.Runners
             User user,
             OptionsDictionary options)
         {
-            string serverName = options.GetValueAs<string>("server-name");
-
             return
                 from _0 in CheckIfHasCorrectUserLevel(user, UserLevel.Admin).ToAsync()
                 from _1 in removeOttdServerUseCase.Execute(
                         user,
-                        command.GuildId!.Value,
-                        serverName)
+                        command.GuildId!.Value)
                     .ToAsync()
-                select (IInteractionResponse) new TextResponse($"{serverName} successfully deleted");
+                select (IInteractionResponse) new TextResponse("OpenTTD server registration removed.");
         }
     }
 }

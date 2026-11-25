@@ -3,7 +3,6 @@ using Discord;
 using OpenttdDiscord.Infrastructure.AutoReplies.CommandRunners;
 using OpenttdDiscord.Infrastructure.AutoReplies.Options;
 using OpenttdDiscord.Infrastructure.Discord.Commands;
-using OpenttdDiscord.Infrastructure.Servers.Options;
 
 namespace OpenttdDiscord.Infrastructure.AutoReplies.Commands
 {
@@ -19,9 +18,6 @@ namespace OpenttdDiscord.Infrastructure.AutoReplies.Commands
         {
             builder
                 .WithDescription("Removes auto reply from given ottd server")
-                .AddOption(
-                    new ServerNameOption()
-                        .WithRequired(true))
                 .AddOption(
                     new AutoReplyTriggerOption()
                         .WithRequired(true));

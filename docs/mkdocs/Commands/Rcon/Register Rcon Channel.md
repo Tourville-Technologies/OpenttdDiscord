@@ -2,7 +2,7 @@
 
 ## Syntax
 
-`/register-rcon-channel server-name:{name} prefix:{prefix}`
+`/register-rcon-channel prefix:{prefix}`
 
 ## Privilege required
 

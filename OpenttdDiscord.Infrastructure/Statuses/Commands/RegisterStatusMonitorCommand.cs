@@ -14,12 +14,7 @@ namespace OpenttdDiscord.Infrastructure.Statuses.Commands
         protected override void Configure(SlashCommandBuilder builder)
         {
             builder
-                .WithDescription("Creates a message that will be regularly updates with server status")
-                .AddOption(new SlashCommandOptionBuilder()
-                    .WithName("server-name")
-                    .WithRequired(true)
-                    .WithDescription("Server name")
-                    .WithType(ApplicationCommandOptionType.String));
+                .WithDescription("Creates a message that will be regularly updates with server status");
         }
     }
 }

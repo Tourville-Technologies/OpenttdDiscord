@@ -41,14 +41,11 @@ namespace OpenttdDiscord.Infrastructure.Rcon.Runners
             ulong guildId = command.GuildId!.Value;
             ulong channelId = command.ChannelId!.Value;
 
-            string serverName = options.GetValueAs<string>("server-name");
             string prefix = options.GetValueAs<string>("prefix");
 
             return
                 from _0 in CheckIfHasCorrectUserLevel(user, UserLevel.Admin).ToAsync()
-                from server in getServerByNameUseCase.Execute(
-                    serverName,
-                    guildId)
+                from server in getServerByNameUseCase.Execute(guildId)
                 from _1 in ErrorIfRconChannelExists(
                     user,
                     server.Id,

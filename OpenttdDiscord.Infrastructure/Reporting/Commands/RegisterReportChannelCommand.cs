@@ -14,12 +14,7 @@ namespace OpenttdDiscord.Infrastructure.Reporting.Commands
         protected override void Configure(SlashCommandBuilder builder)
         {
             builder
-                .WithDescription("Creates user's report channel. Single discord channel can be used by multiple servers")
-                .AddOption(new SlashCommandOptionBuilder()
-                    .WithName("server-name")
-                    .WithRequired(true)
-                    .WithDescription("Name of the server")
-                    .WithType(ApplicationCommandOptionType.String));
+                .WithDescription("Creates a Discord channel for OpenTTD player reports");
         }
     }
 }

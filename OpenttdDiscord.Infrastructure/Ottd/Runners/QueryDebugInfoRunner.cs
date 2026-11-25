@@ -30,7 +30,6 @@ namespace OpenttdDiscord.Infrastructure.Ottd.Runners
             User user,
             OptionsDictionary options)
         {
-            string serverName = options.GetValueAs<string>("server-name");
             ulong guildId = command.GuildId!.Value;
             ulong channelId = command.ChannelId!.Value;
 
@@ -39,9 +38,7 @@ namespace OpenttdDiscord.Infrastructure.Ottd.Runners
                         user,
                         UserLevel.Moderator)
                     .ToAsync()
-                from server in getServerUseCase.Execute(
-                    serverName,
-                    guildId)
+                from server in getServerUseCase.Execute(guildId)
                 from _2 in AkkaService.ExecuteServerAction(
                     new QueryDebugInfo(
                         server.Id,

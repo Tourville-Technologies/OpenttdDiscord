@@ -35,7 +35,6 @@ namespace OpenttdDiscord.Infrastructure.Rcon.Runners
             User user,
             OptionsDictionary options)
         {
-            string serverName = options.GetValueAs<string>("server-name");
             ulong guildId = command.GuildId!.Value;
             ulong channelId = command.ChannelId!.Value;
 
@@ -44,15 +43,13 @@ namespace OpenttdDiscord.Infrastructure.Rcon.Runners
                         user,
                         UserLevel.Admin)
                     .ToAsync()
-                from server in getServerByNameUseCase.Execute(
-                    serverName,
-                    guildId)
+                from server in getServerByNameUseCase.Execute(guildId)
                 from _1 in unregisterRconChannelUseCase.Execute(
                     user,
                     server.Id,
                     guildId,
                     channelId)
-                select (IInteractionResponse) new TextResponse($"Unregistered RCON channel for {serverName}");
+                select (IInteractionResponse) new TextResponse($"Unregistered RCON channel for {server.Name}");
         }
     }
 }

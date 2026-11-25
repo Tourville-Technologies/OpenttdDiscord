@@ -8,7 +8,6 @@ using OpenttdDiscord.Domain.Servers.UseCases;
 using OpenttdDiscord.Infrastructure.AutoReplies.CommandRunners;
 using OpenttdDiscord.Infrastructure.AutoReplies.Options;
 using OpenttdDiscord.Infrastructure.Discord.CommandResponses;
-using OpenttdDiscord.Infrastructure.Servers.Options;
 
 namespace OpenttdDiscord.Infrastructure.Tests.AutoReplies.CommandRunners
 {
@@ -25,9 +24,7 @@ namespace OpenttdDiscord.Infrastructure.Tests.AutoReplies.CommandRunners
             defaultOttdServer = fix.Create<OttdServer>();
             defaultAutoReply = fix.Create<AutoReply>();
 
-            getServerUseCaseSub.Execute(
-                    defaultOttdServer.Name,
-                    GuildId)
+            getServerUseCaseSub.Execute(GuildId)
                 .Returns(defaultOttdServer);
 
             getAutoReplyUseCaseSub.Execute(
@@ -36,9 +33,6 @@ namespace OpenttdDiscord.Infrastructure.Tests.AutoReplies.CommandRunners
                     defaultAutoReply.TriggerMessage)
                 .Returns(Some(defaultAutoReply));
 
-            WithOption(
-                ServerNameOption.OptionName,
-                defaultOttdServer.Name);
             WithOption(
                 AutoReplyTriggerOption.OptionName,
                 defaultAutoReply.TriggerMessage);
@@ -79,9 +73,7 @@ namespace OpenttdDiscord.Infrastructure.Tests.AutoReplies.CommandRunners
         [Fact]
         public async Task ReturnErrorWhenThereIsNoServer()
         {
-            getServerUseCaseSub.Execute(
-                    default!,
-                    default)
+            getServerUseCaseSub.Execute(default(ulong))
                 .ReturnsForAnyArgs(
                     new ServerNotFoundError());
 

@@ -9,6 +9,7 @@ using OpenttdDiscord.Infrastructure.Akkas;
 using OpenttdDiscord.Infrastructure.Discord.CommandResponses;
 using OpenttdDiscord.Infrastructure.Discord.CommandRunners;
 using OpenttdDiscord.Infrastructure.Ottd.Messages;
+using OpenttdDiscord.Infrastructure.Servers;
 
 namespace OpenttdDiscord.Infrastructure.Ottd.Runners
 {
@@ -37,14 +38,11 @@ namespace OpenttdDiscord.Infrastructure.Ottd.Runners
                 return new HumanReadableError("This command can be only run on channel!");
             }
 
-            string serverName = options.GetValueAs<string>("server-name");
             ulong channelId = command.ChannelId.Value;
 
             return
                 from _0 in CheckIfHasCorrectUserLevel(user, UserLevel.Moderator).ToAsync()
-                from server in ottdServerRepository.GetServerByName(
-                    command.GuildId!.Value,
-                    serverName)
+                from server in ottdServerRepository.GetSingleServer(command.GuildId!.Value)
                 from actor in AkkaService.SelectActor(MainActors.Paths.Guilds)
                 from _1 in actor.TellExt(
                         new QueryServer(

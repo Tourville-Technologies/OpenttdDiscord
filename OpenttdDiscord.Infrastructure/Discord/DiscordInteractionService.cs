@@ -33,6 +33,8 @@ namespace OpenttdDiscord.Infrastructure.Discord
             this.logger = logger;
             this.serviceProvider = serviceProvider;
             this.client = client;
+            client.SlashCommandExecuted += Client_SlashCommandExecuted;
+            client.ModalSubmitted += ModalSubmitted;
             foreach (var c in commands)
             {
                 this.commands.Add(
@@ -53,9 +55,6 @@ namespace OpenttdDiscord.Infrastructure.Discord
 
         public async Task Register()
         {
-            client.SlashCommandExecuted += Client_SlashCommandExecuted;
-            client.ModalSubmitted += ModalSubmitted;
-
             await RegisterCommands();
             await PruneCommands();
         }
@@ -87,22 +86,16 @@ namespace OpenttdDiscord.Infrastructure.Discord
             {
                 var props = c.Build();
 
-                if (existingCommands.TryGetValue(
-                        c.Name,
-                        out var existing))
+                if (existingCommands.TryGetValue(c.Name, out var existing))
                 {
-                    int cCount = props.Options.IsSpecified ? props.Options.Value.Count : 0;
-                    int exCount = existing.Options.Count();
-
-                    if (cCount == exCount)
+                    var configuredOptions = props.Options.IsSpecified ? props.Options.Value : Enumerable.Empty<ApplicationCommandOptionProperties>();
+                    if (OptionsMatch(configuredOptions, existing.Options))
                     {
                         continue;
                     }
-                    else
-                    {
-                        await existing.DeleteAsync();
-                        logger.LogError($"Removed {c.Name} due to parameter count mismatch");
-                    }
+
+                    await existing.DeleteAsync();
+                    logger.LogInformation("Re-registering {Command} with updated options", c.Name);
                 }
 
                 try
@@ -120,7 +113,36 @@ namespace OpenttdDiscord.Infrastructure.Discord
             }
         }
 
-        private async Task Client_SlashCommandExecuted(SocketSlashCommand arg)
+        private static bool OptionsMatch(IEnumerable<ApplicationCommandOptionProperties> configured, IEnumerable<IApplicationCommandOption> registered)
+        {
+            return configured.Count() == registered.Count() && Enumerable.Zip(configured, registered, (expected, actual) =>
+                expected.Name == actual.Name &&
+                expected.Type == actual.Type &&
+                OptionsMatch(
+                    expected.Options ?? Enumerable.Empty<ApplicationCommandOptionProperties>(),
+                    actual.Options ?? Enumerable.Empty<IApplicationCommandOption>())).All(matches => matches);
+        }
+
+        private Task Client_SlashCommandExecuted(SocketSlashCommand arg)
+        {
+            // Deferred game actions must not hold Discord's gateway event loop.
+            _ = Task.Run(() => ProcessSlashCommand(arg));
+            return Task.CompletedTask;
+        }
+
+        private async Task ProcessSlashCommand(SocketSlashCommand arg)
+        {
+            try
+            {
+                await RunSlashCommand(arg);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Discord slash command {Command} failed", arg.CommandName);
+            }
+        }
+
+        private async Task RunSlashCommand(SocketSlashCommand arg)
         {
             logger.LogDebug(
                 "{0} executing {1}",

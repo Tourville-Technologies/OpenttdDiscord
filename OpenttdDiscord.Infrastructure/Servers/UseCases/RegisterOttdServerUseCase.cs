@@ -35,23 +35,17 @@ namespace OpenttdDiscord.Infrastructure.Servers.UseCases
             return
                 from _0 in CheckIfHasCorrectUserLevel(user, UserLevel.Admin).ToAsync()
                 from _1 in validator.Validate(server).ToAsync()
-                from _2 in CheckIfSerwerExists(server.GuildId, server.Name)
+                from _2 in EnsureNoServerRegistered(server.GuildId)
                 from _3 in ottdServerRepository.InsertServer(server).ToAsync()
                 from selection in akkaService.SelectActor(MainActors.Paths.Guilds)
                 from _4 in selection.TellExt(new InformAboutServerRegistration(server)).ToAsync()
                 select _4;
         }
 
-        private EitherAsyncUnit CheckIfSerwerExists(ulong guildId, string serverName)
-            => TryAsync<EitherUnit>(async () =>
-            {
-                var existing = await ottdServerRepository.GetServerByName(guildId, serverName);
-                if (existing.IsRight)
-                {
-                    return new HumanReadableError("Server with this name already exists!");
-                }
-
-                return Unit.Default;
-            }).ToEitherAsyncErrorFlat();
+        private EitherAsyncUnit EnsureNoServerRegistered(ulong guildId)
+            => ottdServerRepository.GetServersForGuild(guildId).Bind(servers =>
+                servers.Count == 0
+                    ? EitherAsyncUnit.Right(Unit.Default)
+                    : EitherAsyncUnit.Left(new HumanReadableError("This Discord server already has an OpenTTD server registered.")));
     }
 }

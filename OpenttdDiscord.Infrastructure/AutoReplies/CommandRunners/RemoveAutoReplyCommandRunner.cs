@@ -8,7 +8,6 @@ using OpenttdDiscord.Infrastructure.Akkas;
 using OpenttdDiscord.Infrastructure.AutoReplies.Options;
 using OpenttdDiscord.Infrastructure.Discord.CommandResponses;
 using OpenttdDiscord.Infrastructure.Discord.CommandRunners;
-using OpenttdDiscord.Infrastructure.Servers.Options;
 
 namespace OpenttdDiscord.Infrastructure.AutoReplies.CommandRunners
 {
@@ -32,7 +31,6 @@ namespace OpenttdDiscord.Infrastructure.AutoReplies.CommandRunners
             User user,
             OptionsDictionary options)
         {
-            var serverName = ServerNameOption.GetValue(options);
             var trigger = AutoReplyTriggerOption.GetValue(options);
 
             return
@@ -44,7 +42,6 @@ namespace OpenttdDiscord.Infrastructure.AutoReplies.CommandRunners
                     .ToAsync()
                 from _2 in removeAutoReplyUseCase.Execute(
                     guildId,
-                    serverName,
                     trigger)
                 select new TextResponse("Auto reply has been removed") as IInteractionResponse;
         }

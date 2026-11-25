@@ -36,7 +36,6 @@ namespace OpenttdDiscord.Infrastructure.AutoReplies.CommandRunners
             User user,
             OptionsDictionary options)
         {
-            string serverName = options.GetValueAs<string>("server-name");
             var action = (AutoReplyAction)options.GetValueAs<long>("action");
             string trigger = options.GetValueAs<string>("trigger");
 
@@ -46,16 +45,13 @@ namespace OpenttdDiscord.Infrastructure.AutoReplies.CommandRunners
                     .ToAsync()
                 from guildId in EnsureItIsGuildCommand(command)
                     .ToAsync()
-                from server in getServerUseCase.Execute(
-                    serverName,
-                    guildId)
+                from server in getServerUseCase.Execute(guildId)
                 from autoReply in getAutoReplyUseCase.Execute(
                     guildId,
                     server.Id,
                     trigger)
                 select new ModalResponse(
                     new SetAutoReplyModal(
-                        serverName,
                         action.ToString(),
                         trigger,
                         autoReply.Map(x => x.ResponseMessage))) as IInteractionResponse;

@@ -29,9 +29,6 @@ namespace OpenttdDiscord.Infrastructure.Tests.Rcon.Runners
         public async Task NotExecuteForNonModerator(UserLevel userLevel)
         {
             await WithGuildUser()
-                .WithOption(
-                    "server-name",
-                    "whatever")
                 .WithUserLevel(userLevel)
                 .NotExecuteFor(
                     sut,

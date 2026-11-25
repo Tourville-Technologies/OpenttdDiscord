@@ -2,7 +2,7 @@
 
 ## Syntax
 
-`/unregister-chat-channel server-name:{name}`
+`/unregister-chat-channel`
 
 ## Privilege required
 

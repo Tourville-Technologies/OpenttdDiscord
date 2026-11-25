@@ -2,7 +2,7 @@
 
 ## Syntax
 
-`/register-chat-channel server-name:{name}`
+`/register-chat-channel`
 
 ## Privilege required
 

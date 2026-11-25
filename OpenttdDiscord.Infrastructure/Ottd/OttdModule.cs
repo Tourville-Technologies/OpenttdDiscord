@@ -2,6 +2,7 @@
 using OpenttdDiscord.Infrastructure.Discord.Commands;
 using OpenttdDiscord.Infrastructure.Modularity;
 using OpenttdDiscord.Infrastructure.Ottd.Commands;
+using OpenttdDiscord.Infrastructure.Ottd.Game;
 using OpenttdDiscord.Infrastructure.Ottd.Runners;
 
 namespace OpenttdDiscord.Infrastructure.Ottd
@@ -22,6 +23,8 @@ namespace OpenttdDiscord.Infrastructure.Ottd
     {
         public static IServiceCollection RegisterRunners(this IServiceCollection services)
         {
+            services.AddSingleton<GameServiceControl>();
+            services.AddScoped<GameCommandRunner>();
             services.AddScoped<QueryServerRunner>();
             services.AddScoped<QueryDebugInfoRunner>();
 
@@ -30,6 +33,8 @@ namespace OpenttdDiscord.Infrastructure.Ottd
 
         public static IServiceCollection RegisterCommands(this IServiceCollection services)
         {
+            services.AddSingleton<IOttdSlashCommand>(_ => new GameCommand(admin: false));
+            services.AddSingleton<IOttdSlashCommand>(_ => new GameCommand(admin: true));
             services.AddSingleton<IOttdSlashCommand, QueryServerCommand>();
             services.AddSingleton<IOttdSlashCommand, QueryDebugInfoCommand>();
 

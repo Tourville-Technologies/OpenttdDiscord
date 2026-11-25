@@ -2,7 +2,7 @@
 
 ## Syntax
 
-`/remove-status-monitor server-name:{name}`
+`/remove-status-monitor`
 
 ## Privilege required
 

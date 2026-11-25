@@ -2,7 +2,7 @@
 
 ## Syntax
 
-`/unregister-rcon-channel server-name:{name}`
+`/unregister-rcon-channel`
 
 ## Privilege required
 

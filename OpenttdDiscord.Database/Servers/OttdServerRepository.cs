@@ -64,6 +64,17 @@ namespace OpenttdDiscord.Database.Servers
                 })).IfFail(ex => new ExceptionError(ex));
         }
 
+        public async Task<EitherUnit> SetUnpausePingRole(Guid serverId, ulong? roleId)
+        {
+            return (await TryAsync<EitherUnit>(
+                async () =>
+                {
+                    int updated = await Db.Servers.Where(server => server.Id == serverId)
+                        .ExecuteUpdateAsync(setters => setters.SetProperty(server => server.UnpausePingRoleId, roleId));
+                    return updated == 0 ? EitherUnit.Left(new ServerNotFoundError()) : EitherUnit.Right(Unit.Default);
+                })).IfFail(ex => new ExceptionError(ex));
+        }
+
         public EitherAsync<IError, List<OttdServer>> GetServersForGuild(ulong guildId) => TryAsync(
                 async () =>
                 {

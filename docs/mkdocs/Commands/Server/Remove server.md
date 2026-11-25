@@ -1,7 +1,7 @@
 #command #server 
 ## Syntax
 
-`/remove-ottd-server server-name:{name}`
+`/remove-ottd-server`
 
 ## Privilege required
 

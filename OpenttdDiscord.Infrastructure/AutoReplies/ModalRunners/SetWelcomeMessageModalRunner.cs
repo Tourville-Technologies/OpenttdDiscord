@@ -32,16 +32,13 @@ namespace OpenttdDiscord.Infrastructure.AutoReplies.ModalRunners
             Dictionary<string, IComponentInteractionData> components,
             User user)
         {
-            string serverName = components["server-name"].Value;
             string content = components["content"].Value;
             bool isDeletion = string.IsNullOrWhiteSpace(content);
 
             return
                 from guildId in EnsureItIsGuildModal(modal)
                     .ToAsync()
-                from server in getServerUseCase.Execute(
-                    serverName,
-                    guildId)
+                from server in getServerUseCase.Execute(guildId)
                 from response in isDeletion
                     ? Delete(
                         guildId,

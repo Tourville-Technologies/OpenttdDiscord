@@ -14,12 +14,7 @@ namespace OpenttdDiscord.Infrastructure.EventLogs.Commands
         protected override void Configure(SlashCommandBuilder builder)
         {
             builder
-                .WithDescription("Returns file with latest events from the server")
-                .AddOption(new SlashCommandOptionBuilder()
-                    .WithName("server-name")
-                    .WithRequired(true)
-                    .WithDescription("Name of the server")
-                    .WithType(ApplicationCommandOptionType.String));
+                .WithDescription("Returns file with latest events from the server");
         }
     }
 }

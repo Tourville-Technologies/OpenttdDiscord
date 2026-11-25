@@ -4,7 +4,6 @@ namespace OpenttdDiscord.Domain.AutoReplies.UseCases
     {
         public EitherAsyncUnit Execute(
             ulong guildId,
-            string serverName,
             string triggerMessage);
     }
 }

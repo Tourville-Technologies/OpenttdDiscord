@@ -3,7 +3,6 @@ using OpenttdDiscord.Domain.Security;
 using OpenttdDiscord.Infrastructure.AutoReplies.CommandRunners;
 using OpenttdDiscord.Infrastructure.AutoReplies.Options;
 using OpenttdDiscord.Infrastructure.Discord.CommandResponses;
-using OpenttdDiscord.Infrastructure.Servers.Options;
 
 namespace OpenttdDiscord.Infrastructure.Tests.AutoReplies.CommandRunners
 {
@@ -11,17 +10,12 @@ namespace OpenttdDiscord.Infrastructure.Tests.AutoReplies.CommandRunners
     {
         private readonly IRemoveAutoReplyUseCase removeAutoReplyUseCaseSub = Substitute.For<IRemoveAutoReplyUseCase>();
 
-        private readonly string defaultServerName;
         private readonly string defaultTriggerMessage;
 
         public RemoveAutoReplyCommandRunnerShould()
         {
-            defaultServerName = fix.Create<string>();
             defaultTriggerMessage = fix.Create<string>();
 
-            WithOption(
-                ServerNameOption.OptionName,
-                defaultServerName);
             WithOption(
                 AutoReplyTriggerOption.OptionName,
                 defaultTriggerMessage);
@@ -29,7 +23,6 @@ namespace OpenttdDiscord.Infrastructure.Tests.AutoReplies.CommandRunners
             removeAutoReplyUseCaseSub
                 .Execute(
                     GuildId,
-                    defaultServerName,
                     defaultTriggerMessage)
                 .Returns(Unit.Default);
         }
@@ -58,7 +51,6 @@ namespace OpenttdDiscord.Infrastructure.Tests.AutoReplies.CommandRunners
             removeAutoReplyUseCaseSub
                 .Execute(
                     GuildId,
-                    defaultServerName,
                     defaultTriggerMessage)
                 .Returns(EitherAsyncUnit.Left(error));
 

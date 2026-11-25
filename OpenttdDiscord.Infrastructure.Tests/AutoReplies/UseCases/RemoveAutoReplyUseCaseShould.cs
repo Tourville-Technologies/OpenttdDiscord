@@ -28,10 +28,7 @@ namespace OpenttdDiscord.Infrastructure.Tests.AutoReplies.UseCases
             this.defaultAutoReply = fix.Create<AutoReply>();
 
             getServerUseCaseSub
-                .Execute(
-                    defaultServer.Name,
-                    defaultGuildId
-                )
+                .Execute(defaultGuildId)
                 .Returns(defaultServer);
 
             akkaServiceSub
@@ -62,7 +59,6 @@ namespace OpenttdDiscord.Infrastructure.Tests.AutoReplies.UseCases
             await CreateSut()
                 .Execute(
                     defaultGuildId,
-                    defaultServer.Name,
                     defaultAutoReply.TriggerMessage);
 
             await autoReplyRepositorySub
@@ -87,15 +83,12 @@ namespace OpenttdDiscord.Infrastructure.Tests.AutoReplies.UseCases
         {
             var error = Substitute.For<IError>();
             getServerUseCaseSub
-                .Execute(
-                    defaultServer.Name,
-                    defaultGuildId)
+                .Execute(defaultGuildId)
                 .Returns(EitherAsync<IError, OttdServer>.Left(error));
 
             var result = await CreateSut()
                 .Execute(
                     defaultGuildId,
-                    defaultServer.Name,
                     defaultAutoReply.TriggerMessage);
 
             Assert.Equal(
@@ -133,7 +126,6 @@ namespace OpenttdDiscord.Infrastructure.Tests.AutoReplies.UseCases
             var result = await CreateSut()
                 .Execute(
                     defaultGuildId,
-                    defaultServer.Name,
                     defaultAutoReply.TriggerMessage);
 
             Assert.True(result.IsLeft);

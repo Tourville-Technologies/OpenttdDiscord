@@ -9,13 +9,10 @@ namespace OpenttdDiscord.Infrastructure.AutoReplies.Modals
     internal class SetWelcomeMessageModal : OttdModalBase
     {
         public string InitialWelcomeMessage { get; }
-        public string ServerName { get; }
 
-        public SetWelcomeMessageModal(Option<string> initialWelcomeMessage,
-                                      string serverName)
+        public SetWelcomeMessageModal(Option<string> initialWelcomeMessage)
             : base(AutoReplyModals.SetWelcomeMessage)
         {
-            this.ServerName = serverName;
             this.InitialWelcomeMessage = initialWelcomeMessage
                 .IfNone(string.Empty);
         }
@@ -24,10 +21,6 @@ namespace OpenttdDiscord.Infrastructure.AutoReplies.Modals
         {
             builder
                 .WithTitle("Set welcome message")
-                .AddTextInput(
-                    "Server Name",
-                    "server-name",
-                    value: ServerName)
                 .AddTextInput(
                     "Welcome message",
                     "content",

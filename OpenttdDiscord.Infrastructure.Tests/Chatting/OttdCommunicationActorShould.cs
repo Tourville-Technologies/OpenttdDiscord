@@ -70,13 +70,15 @@ namespace OpenttdDiscord.Infrastructure.Tests.Chatting
             services.AddSingleton(akkaServiceMock);
         }
 
-        [Fact]
-        public void SendProperMessage_FromOttd()
+        [Theory]
+        [InlineData(NetworkAction.NETWORK_ACTION_SERVER_MESSAGE)]
+        [InlineData(NetworkAction.NETWORK_ACTION_CHAT)]
+        public void SendProperMessage_FromOttd(NetworkAction action)
         {
             var msg = new AdminChatMessageEvent(
                 validPlayer,
                 ChatDestination.DESTTYPE_BROADCAST,
-                NetworkAction.NETWORK_ACTION_SERVER_MESSAGE,
+                action,
                 "2137");
 
             sut.Tell(msg);
@@ -89,6 +91,20 @@ namespace OpenttdDiscord.Infrastructure.Tests.Chatting
             chatChannelProbe
                 .ExpectMsg(
                     expectedMessage);
+        }
+
+        [Fact]
+        public void RelayPlayerLifecycleToDiscord()
+        {
+            var spectator = validPlayer with { PlayingAs = 255 };
+            var member = validPlayer with { PlayingAs = 3 };
+            sut.Tell(new AdminClientJoinEvent(spectator));
+            sut.Tell(new AdminClientUpdateEvent(member));
+            sut.Tell(new AdminClientDisconnectEvent(member, "quit"));
+
+            chatChannelProbe.ExpectMsg(new HandleOttdMessage(ottdServer, "OpenTTD", $"{validPlayer.Name} has joined the game.", DiscordOnly: true));
+            chatChannelProbe.ExpectMsg(new HandleOttdMessage(ottdServer, "OpenTTD", $"{validPlayer.Name} has joined company #4.", DiscordOnly: true));
+            chatChannelProbe.ExpectMsg(new HandleOttdMessage(ottdServer, "OpenTTD", $"{validPlayer.Name} has left the game.", DiscordOnly: true));
         }
 
         [Fact]
@@ -134,7 +150,7 @@ namespace OpenttdDiscord.Infrastructure.Tests.Chatting
             var msg = new AdminChatMessageEvent(
                 validPlayer,
                 invalidChatDestination,
-                NetworkAction.NETWORK_ACTION_JOIN,
+                NetworkAction.NETWORK_ACTION_CHAT,
                 "2137");
 
             sut.Tell(msg);

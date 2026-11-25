@@ -4,6 +4,6 @@ namespace OpenttdDiscord.Domain.Servers.UseCases
 {
     public interface IRemoveOttdServerUseCase
     {
-        Task<EitherUnit> Execute(User userRights, ulong guildId, string serverName);
+        Task<EitherUnit> Execute(User userRights, ulong guildId);
     }
 }

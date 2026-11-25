@@ -2,7 +2,7 @@
 
 ## Syntax
 
-`/set-welcome-message server-name:{name}`
+`/set-welcome-message`
 
 
 ## Privilege required

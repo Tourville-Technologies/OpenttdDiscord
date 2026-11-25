@@ -22,10 +22,7 @@ namespace OpenttdDiscord.Infrastructure.Tests.AutoReplies.ModalRunners
             defaultAutoReply = fix.Create<AutoReply>();
             defaultServer = fix.Create<OttdServer>() with { Name = defaultServerName };
 
-            getServerUseCaseSub.Execute(
-                    defaultServerName,
-                    GuildId
-                )
+            getServerUseCaseSub.Execute(GuildId)
                 .Returns(defaultServer);
 
             upsertAutoReplyUseCaseSub
@@ -36,9 +33,6 @@ namespace OpenttdDiscord.Infrastructure.Tests.AutoReplies.ModalRunners
                 .ReturnsForAnyArgs(Unit.Default);
 
             WithTextInput(
-                    "server-name",
-                    defaultServerName)
-                .WithTextInput(
                     "trigger",
                     defaultAutoReply.TriggerMessage)
                 .WithTextInput(

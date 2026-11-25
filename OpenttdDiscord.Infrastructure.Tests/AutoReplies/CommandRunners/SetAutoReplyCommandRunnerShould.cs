@@ -27,14 +27,9 @@ namespace OpenttdDiscord.Infrastructure.Tests.AutoReplies.CommandRunners
             defaultServer = fix.Create<OttdServer>() with { Name = defaultServerName };
 
             getServerUseCaseSub
-                .Execute(
-                    defaultServerName,
-                    GuildId)
+                .Execute(GuildId)
                 .Returns(defaultServer);
 
-            WithOption(
-                "server-name",
-                defaultServerName);
             WithOption(
                 "action",
                 defaultAction
@@ -70,9 +65,6 @@ namespace OpenttdDiscord.Infrastructure.Tests.AutoReplies.CommandRunners
             var modal = (SetAutoReplyModal) value.Modal;
 
             Assert.Equal(
-                defaultServerName,
-                modal.ServerName);
-            Assert.Equal(
                 defaultTrigger,
                 modal.TriggerMessage);
             Assert.Equal(
@@ -103,9 +95,6 @@ namespace OpenttdDiscord.Infrastructure.Tests.AutoReplies.CommandRunners
             var value = (ModalResponse) result.Right();
             var modal = (SetAutoReplyModal) value.Modal;
 
-            Assert.Equal(
-                defaultServerName,
-                modal.ServerName);
             Assert.Equal(
                 defaultTrigger,
                 modal.TriggerMessage);

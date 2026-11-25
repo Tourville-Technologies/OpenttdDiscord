@@ -2,7 +2,7 @@
 
 ## Syntax
 
-`/query-debug-info server-name:{name}`
+`/query-debug-info`
 
 ## Privilege required
 

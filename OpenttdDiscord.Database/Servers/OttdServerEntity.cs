@@ -14,6 +14,8 @@ int AdminPort,
 string AdminPortPassword
 )
 {
+    public ulong? UnpausePingRoleId { get; set; }
+
     public List<StatusMonitorEntity> Monitors { get; set; } = default!;
 
     public OttdServerEntity(OttdServer ottdServer)
@@ -25,6 +27,7 @@ string AdminPortPassword
         ottdServer.AdminPort,
         ottdServer.AdminPortPassword)
     {
+        UnpausePingRoleId = ottdServer.UnpausePingRoleId;
     }
 
     public OttdServer ToDomain()
@@ -35,7 +38,7 @@ string AdminPortPassword
             Ip,
             Name,
             AdminPort,
-            AdminPortPassword);
+            AdminPortPassword) { UnpausePingRoleId = UnpausePingRoleId };
     }
 
     [ExcludeFromCodeCoverage]

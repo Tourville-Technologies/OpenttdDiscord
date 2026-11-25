@@ -14,12 +14,7 @@ namespace OpenttdDiscord.Infrastructure.Ottd.Commands
         protected override void Configure(SlashCommandBuilder builder)
         {
             builder
-                .WithDescription("Displays basic information about the server")
-                .AddOption(new SlashCommandOptionBuilder()
-                    .WithName("server-name")
-                    .WithRequired(true)
-                    .WithDescription("Name of the server")
-                    .WithType(ApplicationCommandOptionType.String));
+                .WithDescription("Displays basic information about the server");
         }
     }
 }

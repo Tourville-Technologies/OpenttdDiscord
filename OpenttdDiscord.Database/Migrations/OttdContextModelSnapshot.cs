@@ -105,6 +105,9 @@ namespace OpenttdDiscord.Database.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<decimal?>("UnpausePingRoleId")
+                        .HasColumnType("numeric(20,0)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Name")

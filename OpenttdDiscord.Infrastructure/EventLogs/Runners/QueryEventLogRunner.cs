@@ -35,13 +35,10 @@ namespace OpenttdDiscord.Infrastructure.EventLogs.Runners
             OptionsDictionary options)
         {
             ulong guildId = command.GuildId!.Value;
-            string serverName = options.GetValueAs<string>("server-name");
 
             return
                 from _0 in CheckIfHasCorrectUserLevel(user, UserLevel.Moderator).ToAsync()
-                from server in getServerUseCase.Execute(
-                    serverName,
-                    guildId)
+                from server in getServerUseCase.Execute(guildId)
                 from messages in queryServerChatUseCase.Execute(
                     user,
                     server.Id,

@@ -15,16 +15,8 @@ namespace OpenttdDiscord.Infrastructure.Servers.UseCases
             this.ottdServerRepository = ottdServerRepository;
         }
 
-        public EitherAsync<IError, OttdServer> Execute(
-            string serverName,
-            ulong guildId)
-        {
-            return
-                from server in ottdServerRepository.GetServerByName(
-                    guildId,
-                    serverName)
-                select server;
-        }
+        public EitherAsync<IError, OttdServer> Execute(ulong guildId)
+            => ottdServerRepository.GetSingleServer(guildId);
 
         public EitherAsync<IError, OttdServer> Execute(
             Guid serverId)

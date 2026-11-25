@@ -12,7 +12,6 @@ using OpenttdDiscord.Infrastructure.Akkas;
 using OpenttdDiscord.Infrastructure.AutoReplies.Options;
 using OpenttdDiscord.Infrastructure.Discord.CommandResponses;
 using OpenttdDiscord.Infrastructure.Discord.CommandRunners;
-using OpenttdDiscord.Infrastructure.Servers.Options;
 
 namespace OpenttdDiscord.Infrastructure.AutoReplies.CommandRunners
 {
@@ -39,15 +38,12 @@ namespace OpenttdDiscord.Infrastructure.AutoReplies.CommandRunners
             User user,
             OptionsDictionary options)
         {
-            var serverName = options.GetValueAs<string>(ServerNameOption.OptionName);
             var trigger = options.GetValueAs<string>(AutoReplyTriggerOption.OptionName);
 
             return
                 from guildId in EnsureItIsGuildCommand(command)
                     .ToAsync()
-                from server in getServerUseCase.Execute(
-                    serverName,
-                    guildId)
+                from server in getServerUseCase.Execute(guildId)
                 from autoReplyOption in getAutoReplyUseCase.Execute(
                     guildId,
                     server.Id,

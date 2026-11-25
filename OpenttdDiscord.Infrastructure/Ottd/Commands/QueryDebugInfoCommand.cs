@@ -14,12 +14,7 @@ namespace OpenttdDiscord.Infrastructure.Ottd.Commands
         protected override void Configure(SlashCommandBuilder builder)
         {
             builder
-                .WithDescription("Query debug information about server. Used mianly for plugin development")
-                .AddOption(new SlashCommandOptionBuilder()
-                    .WithName("server-name")
-                    .WithDescription("Server name")
-                    .WithRequired(true)
-                    .WithType(ApplicationCommandOptionType.String));
+                .WithDescription("Query debug information about server. Used mianly for plugin development");
         }
     }
 }

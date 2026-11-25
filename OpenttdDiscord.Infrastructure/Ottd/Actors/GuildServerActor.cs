@@ -1,4 +1,6 @@
 ﻿using Akka.Actor;
+using Discord;
+using Discord.WebSocket;
 using LanguageExt;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -19,6 +21,7 @@ using OpenttdDiscord.Infrastructure.Discord.Messages;
 using OpenttdDiscord.Infrastructure.EventLogs.Actors;
 using OpenttdDiscord.Infrastructure.EventLogs.Messages;
 using OpenttdDiscord.Infrastructure.Maintenance.Actors;
+using OpenttdDiscord.Infrastructure.Ottd.Game;
 using OpenttdDiscord.Infrastructure.Ottd.Messages;
 using OpenttdDiscord.Infrastructure.Statuses.Actors;
 using OpenttdDiscord.Infrastructure.Statuses.Messages;
@@ -31,12 +34,14 @@ namespace OpenttdDiscord.Infrastructure.Ottd.Actors
         private readonly OttdServer server;
         private readonly AdminPortClient client;
         private readonly IAkkaService akkaService;
+        private readonly GameSession game;
         private readonly IGetStatusMonitorsForServerUseCase getStatusMonitorsForServerUseCase;
         private readonly IUpdateStatusMonitorUseCase updateStatusMonitorUseCase;
         private readonly IGetChatChannelUseCase getChatChannelUseCase;
         private readonly ExtDictionary<ulong, IActorRef> statusMonitorActors = new();
         private readonly ExtDictionary<ulong, ChattingActors> chatChannelActors = new();
         private readonly System.Collections.Generic.HashSet<IActorRef> adminEventSubscribers = new();
+        private bool receivedAdminEvents;
         private Option<IActorRef> chatStorageActor = Option<IActorRef>.None;
         private Option<IActorRef> healthCheckACtor = Option<IActorRef>.None;
 
@@ -61,6 +66,8 @@ namespace OpenttdDiscord.Infrastructure.Ottd.Actors
             new(server.Ip, server.AdminPort, server.AdminPortPassword),
             logging => logging.AddSerilog());
 
+            game = new GameSession(client);
+
             RconConstructor();
             ReportConstructor();
             AutoReplyConstructor(client);
@@ -83,7 +90,10 @@ namespace OpenttdDiscord.Infrastructure.Ottd.Actors
             ReceiveAsync<UnregisterChatChannel>(UnregisterChatChannel);
 
             Receive<KillDanglingActor>(msg => msg.commandActor.GracefulStop(TimeSpan.FromSeconds(1)));
-            Receive<IAdminEvent>(ev => adminEventSubscribers.TellMany(ev));
+            ReceiveAsync<GameRequest>(HandleGameRequest);
+            ReceiveAsync<CloseGameVote>(FinishGameVote);
+            ReceiveAsync<AdminServerConnectionLost>(ReconnectSecure);
+            Receive<IAdminEvent>(HandleAdminEvent);
             Receive<SubscribeToAdminEvents>(m => adminEventSubscribers.Add(m.Subscriber));
             Receive<UnsubscribeFromAdminEvents>(m => adminEventSubscribers.Remove(m.subscriber));
             Receive<RetrieveEventLog>(RedirectMessageToEventLog);
@@ -103,6 +113,7 @@ namespace OpenttdDiscord.Infrastructure.Ottd.Actors
         private async Task InitGuildServerActorMessage(InitGuildServerActorMessage _)
         {
             logger.LogInformation($"Connecting to {server.Name} on {server.Ip}:{server.AdminPort}");
+            client.SetAdminEventHandler(ev => self.Tell(ev));
             await client.ConnectSecure();
 
             var monitors = (await getStatusMonitorsForServerUseCase.Execute(User.Master, server.Id))
@@ -124,8 +135,6 @@ namespace OpenttdDiscord.Infrastructure.Ottd.Actors
                 RegisterChatChannel(new(cc));
             }
 
-            client.SetAdminEventHandler(ev => self.Tell(ev));
-
             await RconInit();
             await ReportInit();
 
@@ -136,6 +145,94 @@ namespace OpenttdDiscord.Infrastructure.Ottd.Actors
                         client,
                         server,
                         SP)));
+        }
+
+        private void HandleAdminEvent(IAdminEvent message)
+        {
+            receivedAdminEvents = true;
+            if (message is AdminChatMessageEvent chat && game.ConsumeLink(chat))
+            {
+                return;
+            }
+
+            if (message is AdminClientDisconnectEvent disconnect)
+            {
+                game.Disconnect(disconnect.Player.ClientId);
+            }
+
+            adminEventSubscribers.TellMany(message);
+        }
+
+        private async Task ReconnectSecure(AdminServerConnectionLost message)
+        {
+            adminEventSubscribers.TellMany(message);
+            if (!receivedAdminEvents)
+            {
+                return;
+            }
+
+            receivedAdminEvents = false;
+            game.Clear();
+
+            // The AdminPort library's automatic retry uses legacy authentication.
+            await client.Disconnect();
+            await client.ConnectSecure();
+        }
+
+        private async Task HandleGameRequest(GameRequest request)
+        {
+            var sender = Sender;
+            try
+            {
+                var reply = await game.Execute(request);
+                if (reply.OpenedVote is { } voteId)
+                {
+                    Timers.StartSingleTimer(voteId, new CloseGameVote(voteId, request.ChannelId), GameSession.VoteDuration);
+                }
+
+                sender.Tell(reply);
+            }
+            catch (TimeoutException)
+            {
+                sender.Tell(new GameReply("OpenTTD did not answer. Check the admin connection and companion OpenTTD patch."));
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Game command {Action} failed for server {ServerId}", request.Action, server.Id);
+                sender.Tell(new GameReply("OpenTTD could not complete the command."));
+            }
+        }
+
+        private async Task FinishGameVote(CloseGameVote vote)
+        {
+            GameReply? result;
+            try
+            {
+                result = await game.FinishVote(vote.Id);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Could not close the vote for OpenTTD server {ServerId}", server.Id);
+                result = new GameReply("Could not complete the unpause vote. Check whether OpenTTD is connected before voting again.");
+            }
+
+            if (result is null)
+            {
+                return;
+            }
+
+            try
+            {
+                var discord = SP.GetRequiredService<DiscordSocketClient>();
+                if (await discord.GetChannelAsync(vote.ChannelId) is IMessageChannel channel)
+                {
+                    await channel.SendMessageAsync(result.Text, allowedMentions: AllowedMentions.None);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Could not post vote result for OpenTTD server {ServerId}", server.Id);
+            }
         }
 
         private void ExecuteServerAction(ExecuteServerAction cmd)
@@ -196,8 +293,8 @@ namespace OpenttdDiscord.Infrastructure.Ottd.Actors
                 return;
             }
 
-            var discord = Context.ActorOf(DiscordCommunicationActor.Create(SP, rcc.chatChannel.ChannelId, client, server), "discordCommunication");
-            var openttd = Context.ActorOf(OttdCommunicationActor.Create(SP, rcc.chatChannel.ChannelId, server, client), "ottdCommunication");
+            var discord = Context.ActorOf(DiscordCommunicationActor.Create(SP, rcc.chatChannel.ChannelId, client, server), $"discordCommunication-{rcc.chatChannel.ChannelId}");
+            var openttd = Context.ActorOf(OttdCommunicationActor.Create(SP, rcc.chatChannel.ChannelId, server, client), $"ottdCommunication-{rcc.chatChannel.ChannelId}");
 
             var chattingActors = new ChattingActors(rcc.chatChannel, discord, openttd);
             chatChannelActors.Add(rcc.chatChannel.ChannelId, chattingActors);
@@ -219,6 +316,8 @@ namespace OpenttdDiscord.Infrastructure.Ottd.Actors
                 actors.Ottd.GracefulStop(TimeSpan.FromSeconds(1))
                 );
 
+            chatChannelActors.Remove(ucc.ChannelId);
+
             await
             (from chatManager in akkaService.SelectActor(MainActors.Paths.ChatChannelManager)
              from _1 in chatManager.TellExt(ucc).ToAsync()
@@ -235,5 +334,7 @@ namespace OpenttdDiscord.Infrastructure.Ottd.Actors
             var actor = (IActorRef)chatStorageActor.Case!;
             actor.Forward(msg);
         }
+
+        private sealed record CloseGameVote(Guid Id, ulong ChannelId);
     }
 }

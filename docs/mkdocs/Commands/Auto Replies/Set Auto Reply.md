@@ -2,7 +2,7 @@
 
 ## Syntax
 
-`/set-auto-reply server-name:{name} trigger-message:{trigger} action:{action}`
+`/set-auto-reply trigger-message:{trigger} action:{action}`
 
 
 ## Privilege required

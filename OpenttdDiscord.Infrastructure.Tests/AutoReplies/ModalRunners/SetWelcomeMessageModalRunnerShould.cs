@@ -31,9 +31,7 @@ namespace OpenttdDiscord.Infrastructure.Tests.AutoReplies.ModalRunners
             };
 
             getServerUseCaseSub
-                .Execute(
-                    defaultServerName,
-                    GuildId)
+                .Execute(GuildId)
                 .Returns(defaultServer);
 
             upsertWelcomeMessageUseCaseSub
@@ -49,9 +47,6 @@ namespace OpenttdDiscord.Infrastructure.Tests.AutoReplies.ModalRunners
                 getServerUseCaseSub);
 
             WithTextInput(
-                    "server-name",
-                    defaultServerName)
-                .WithTextInput(
                     "content",
                     defaultContent);
         }

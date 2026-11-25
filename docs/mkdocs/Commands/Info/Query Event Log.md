@@ -2,7 +2,7 @@
 
 ## Syntax
 
-`/query-event-log server-name:{name}`
+`/query-event-log`
 
 ## Privilege required
 

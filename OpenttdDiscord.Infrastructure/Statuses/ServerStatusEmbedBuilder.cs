@@ -13,7 +13,8 @@ namespace OpenttdDiscord.Infrastructure.Statuses
             EmbedBuilder embedBuilder = new();
             embedBuilder.WithTitle($"{info.ServerName} Status");
 
-            embedBuilder.AddField("Players", serverStatus.Players.Count, true);
+            var clients = serverStatus.Players.Values.Where(player => player.ClientId != 1).ToArray();
+            embedBuilder.AddField("Players", clients.Length, true);
             embedBuilder.AddField("Map Size", $"{info.MapWidth}x{info.MapHeight}", true);
             embedBuilder.AddField("Year", info.Date, true);
 
@@ -21,7 +22,12 @@ namespace OpenttdDiscord.Infrastructure.Statuses
             embedBuilder.AddField("Climate", info.Landscape.ToHumanReadable(), true);
             embedBuilder.AddField("Server address", $"{client.ServerInfo.ServerIp}", true);
 
-            string players = string.Join('\n', serverStatus.Players.Values.Select(StringifyPlayer));
+            string players = string.Join('\n', clients.Select(player => player.Name));
+            if (players.Length > 1024)
+            {
+                players = players[..1020] + " …";
+            }
+
             if (!string.IsNullOrEmpty(players))
             {
                 embedBuilder.AddField("Players", players, false);
@@ -29,13 +35,6 @@ namespace OpenttdDiscord.Infrastructure.Statuses
 
             var embed = embedBuilder.Build();
             return embed;
-        }
-
-        private string StringifyPlayer(Player player)
-        {
-            return player.ClientId == 1 ?
-                $"{player.Name} [Server]" :
-                player.Name;
         }
     }
 }

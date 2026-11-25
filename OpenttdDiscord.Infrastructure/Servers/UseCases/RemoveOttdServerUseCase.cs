@@ -25,18 +25,15 @@ namespace OpenttdDiscord.Infrastructure.Servers.UseCases
 
         public async Task<EitherUnit> Execute(
             User user,
-            ulong guildId,
-            string serverName)
+            ulong guildId)
         {
-            logger.LogInformation($"Removing {serverName} for {user}");
+            logger.LogInformation("Removing the OpenTTD server registered for guild {GuildId}", guildId);
             return await
                 (from _1 in CheckIfHasCorrectUserLevel(
                             user,
                             UserLevel.Admin)
                         .ToAsync()
-                    from server in ottdServerRepository.GetServerByName(
-                        guildId,
-                        serverName)
+                    from server in ottdServerRepository.GetSingleServer(guildId)
                     from _2 in ottdServerRepository.DeleteServer(server.Id)
                         .ToAsync()
                     from actor in akkaService.SelectActor(MainActors.Paths.Guilds)

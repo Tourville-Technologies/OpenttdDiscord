@@ -29,13 +29,10 @@ namespace OpenttdDiscord.Infrastructure.AutoReplies.UseCases
 
         public EitherAsyncUnit Execute(
             ulong guildId,
-            string serverName,
             string triggerMessage)
         {
             var ret =
-                from server in getServerUseCase.Execute(
-                    serverName,
-                    guildId)
+                from server in getServerUseCase.Execute(guildId)
                 from autoReply in getAutoReplyUseCase.Execute(
                     guildId, server.Id, triggerMessage)
                 from _1 in autoReply.ErrorWhenNone(() => AutoReplyNotFound.Instance)

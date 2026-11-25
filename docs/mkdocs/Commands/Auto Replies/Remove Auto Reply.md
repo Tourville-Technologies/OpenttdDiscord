@@ -2,7 +2,7 @@
 
 ## Syntax
 
-`/remove-auto-reply server-name:{name} trigger-message:{trigger}`
+`/remove-auto-reply trigger-message:{trigger}`
 
 
 ## Privilege required

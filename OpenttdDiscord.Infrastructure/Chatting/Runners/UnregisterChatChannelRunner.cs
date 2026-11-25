@@ -36,7 +36,6 @@ namespace OpenttdDiscord.Infrastructure.Chatting.Runners
             User user,
             OptionsDictionary options)
         {
-            string serverName = options.GetValueAs<string>("server-name");
             ulong guildId = command.GuildId!.Value;
             ulong channelId = command.ChannelId!.Value;
 
@@ -45,9 +44,7 @@ namespace OpenttdDiscord.Infrastructure.Chatting.Runners
                         user,
                         UserLevel.Admin)
                     .ToAsync()
-                from server in getServerByNameUseCase.Execute(
-                    serverName,
-                    guildId)
+                from server in getServerByNameUseCase.Execute(guildId)
                 from _1 in unregisterChatChannelUseCase.Execute(
                     user,
                     server.Id,

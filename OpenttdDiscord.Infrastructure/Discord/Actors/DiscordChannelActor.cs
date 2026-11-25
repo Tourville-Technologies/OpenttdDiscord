@@ -81,7 +81,7 @@ namespace OpenttdDiscord.Infrastructure.Discord.Actors
             string message = $"[{msg.Server.Name}] {msg.Username}: {translated}";
             await messageChannel.IfSomeAsync(async channel =>
             {
-                await channel.SendMessageAsync(message);
+                await channel.SendMessageAsync(message, allowedMentions: AllowedMentions.None);
             });
         }
 

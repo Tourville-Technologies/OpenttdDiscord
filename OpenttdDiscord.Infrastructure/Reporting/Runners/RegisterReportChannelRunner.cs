@@ -35,15 +35,12 @@ namespace OpenttdDiscord.Infrastructure.Reporting.Runners
             User user,
             OptionsDictionary options)
         {
-            string serverName = options.GetValueAs<string>("server-name");
             ulong guildId = command.GuildId!.Value;
             ulong channelId = command.ChannelId!.Value;
 
             return
                 from _0 in CheckIfHasCorrectUserLevel(user, UserLevel.Admin).ToAsync()
-                from server in getServerUseCase.Execute(
-                    serverName,
-                    guildId)
+                from server in getServerUseCase.Execute(guildId)
                 from _1 in registerReportChannelUseCase.Execute(
                     user,
                     new ReportChannel(

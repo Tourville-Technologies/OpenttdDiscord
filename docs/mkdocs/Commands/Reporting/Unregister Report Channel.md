@@ -2,7 +2,7 @@
 
 ## Syntax
 
-`/unregister-report-channel server-name:{name}`
+`/unregister-report-channel`
 
 ## Privilege required
 

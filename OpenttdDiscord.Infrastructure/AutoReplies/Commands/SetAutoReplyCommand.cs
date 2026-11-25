@@ -20,12 +20,6 @@ namespace OpenttdDiscord.Infrastructure.AutoReplies.Commands
                 .WithDescription("Autoreply lets server automatically reply and execute action upon user message")
                 .AddOption(
                     new SlashCommandOptionBuilder()
-                        .WithName("server-name")
-                        .WithDescription("Server name")
-                        .WithType(ApplicationCommandOptionType.String)
-                        .WithRequired(true))
-                .AddOption(
-                    new SlashCommandOptionBuilder()
                         .WithName("trigger")
                         .WithDescription("Message which is used to trigger a response from auto reply.")
                         .WithType(ApplicationCommandOptionType.String)

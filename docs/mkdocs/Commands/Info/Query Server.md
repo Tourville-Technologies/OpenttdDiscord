@@ -2,7 +2,7 @@
 
 ## Syntax
 
-`/query-server server-name:{name}`
+`/query-server`
 
 ## Privilege required
 

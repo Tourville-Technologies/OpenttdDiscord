@@ -16,13 +16,7 @@ namespace OpenttdDiscord.Infrastructure.AutoReplies.Commands
         protected override void Configure(SlashCommandBuilder builder)
         {
             builder
-                .WithDescription("Gets all auto replies trigger messages for the server")
-                .AddOption(
-                    new SlashCommandOptionBuilder()
-                        .WithName("server-name")
-                        .WithDescription("Name of the server")
-                        .WithType(ApplicationCommandOptionType.String)
-                        .WithRequired(true));
+                .WithDescription("Gets all auto replies trigger messages for the server");
         }
     }
 }

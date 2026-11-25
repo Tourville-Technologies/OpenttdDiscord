@@ -7,4 +7,7 @@ public record OttdServer(
     string Name,
     int AdminPort,
     string AdminPortPassword
-    );
+    )
+{
+    public ulong? UnpausePingRoleId { get; init; }
+}

@@ -6,6 +6,8 @@ namespace OpenttdDiscord.Domain.Servers
 
         Task<EitherUnit> UpdateServer(OttdServer server);
 
+        Task<EitherUnit> SetUnpausePingRole(Guid serverId, ulong? roleId);
+
         Task<EitherUnit> DeleteServer(Guid serverId);
 
         EitherAsync<IError, List<OttdServer>> GetServersForGuild(ulong guildId);

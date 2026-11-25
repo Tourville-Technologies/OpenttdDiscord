@@ -2,7 +2,7 @@
 
 ## Syntax
 
-`/register-status-monitor server-name:{name}`
+`/register-status-monitor`
 
 ## Privilege required
 

@@ -2,5 +2,5 @@
 
 namespace OpenttdDiscord.Infrastructure.Chatting.Messages
 {
-    internal record HandleOttdMessage(OttdServer Server, string Username, string Message);
+    internal record HandleOttdMessage(OttdServer Server, string Username, string Message, bool DiscordOnly = false);
 }

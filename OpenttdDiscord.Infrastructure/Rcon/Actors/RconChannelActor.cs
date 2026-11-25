@@ -9,6 +9,7 @@ using OpenTTDAdminPort.Events;
 using OpenTTDAdminPort.Messages;
 using OpenttdDiscord.Domain.Rcon;
 using OpenttdDiscord.Domain.Servers;
+using OpenttdDiscord.Infrastructure.Ottd.Game;
 using OpenttdDiscord.Infrastructure.Ottd.Messages;
 using OpenttdDiscord.Infrastructure.Rcon.Messages;
 
@@ -101,7 +102,10 @@ namespace OpenttdDiscord.Infrastructure.Rcon.Actors
 
         private void HandleRconEvent(AdminRconEvent e)
         {
-            messageToBeSent.AppendLine(e.Message);
+            if (!e.Message.StartsWith(GameConsole.ReplyPrefix, StringComparison.Ordinal))
+            {
+                messageToBeSent.AppendLine(e.Message);
+            }
         }
 
         private async Task SentQueuedRconText(SentQueuedRconText _)

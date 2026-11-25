@@ -30,7 +30,6 @@ namespace OpenttdDiscord.Infrastructure.AutoReplies.ModalRunners
             Dictionary<string, IComponentInteractionData> components,
             User user)
         {
-            string serverName = components["server-name"].Value;
             string triggerMessage = components["trigger"].Value;
             var action = Enum.Parse<AutoReplyAction>(
                 components["action"].Value,
@@ -43,9 +42,7 @@ namespace OpenttdDiscord.Infrastructure.AutoReplies.ModalRunners
                     .ToAsync()
                 from guildId in EnsureItIsGuildModal(modal)
                     .ToAsync()
-                from server in getServerUseCase.Execute(
-                    serverName,
-                    guildId)
+                from server in getServerUseCase.Execute(guildId)
                 from _4 in upsertAutoReplyUseCase.Execute(
                     guildId,
                     server.Id,

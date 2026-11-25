@@ -38,13 +38,10 @@ namespace OpenttdDiscord.Infrastructure.AutoReplies.CommandRunners
             User user,
             OptionsDictionary options)
         {
-            string serverName = options.GetValueAs<string>("server-name");
             return
                 from guildId in EnsureItIsGuildCommand(command)
                     .ToAsync()
-                from server in getServerUseCase.Execute(
-                    serverName,
-                    guildId)
+                from server in getServerUseCase.Execute(guildId)
                 from autoReplies in getAutoReplyUseCase.Execute(
                     guildId,
                     server.Id)

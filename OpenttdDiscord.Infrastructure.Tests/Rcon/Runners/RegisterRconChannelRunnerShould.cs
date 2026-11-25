@@ -38,9 +38,6 @@ namespace OpenttdDiscord.Infrastructure.Tests.Rcon.Runners
         {
             await WithGuildUser()
                 .WithOption(
-                    "server-name",
-                    "whatever")
-                .WithOption(
                     "prefix",
                     "whatever")
                 .WithUserLevel(userLevel)

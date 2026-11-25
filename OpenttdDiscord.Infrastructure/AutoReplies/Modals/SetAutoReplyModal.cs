@@ -7,19 +7,16 @@ namespace OpenttdDiscord.Infrastructure.AutoReplies.Modals
     [ExcludeFromCodeCoverage]
     public class SetAutoReplyModal : OttdModalBase
     {
-        public string ServerName { get; }
         public string TriggerMessage { get; }
         public string ResponseMessage { get; }
         public string AdditionalAction { get; }
 
         public SetAutoReplyModal(
-            string serverName,
             string additionalAction,
             string triggerMessage,
             Option<string> responseMessage)
             : base(AutoReplyModals.SetAutoReply)
         {
-            this.ServerName = serverName;
             AdditionalAction = additionalAction;
             TriggerMessage = triggerMessage;
             this.ResponseMessage = responseMessage
@@ -30,11 +27,6 @@ namespace OpenttdDiscord.Infrastructure.AutoReplies.Modals
         {
             builder
                 .WithTitle("Set auto reply")
-                .AddTextInput(
-                    "Server Name",
-                    "server-name",
-                    value: ServerName,
-                    required: true)
                 .AddTextInput(
                     "Action",
                     "action",

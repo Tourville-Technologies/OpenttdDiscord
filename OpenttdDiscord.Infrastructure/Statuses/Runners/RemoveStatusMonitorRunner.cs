@@ -9,6 +9,7 @@ using OpenttdDiscord.Domain.Statuses.UseCases;
 using OpenttdDiscord.Infrastructure.Akkas;
 using OpenttdDiscord.Infrastructure.Discord.CommandResponses;
 using OpenttdDiscord.Infrastructure.Discord.CommandRunners;
+using OpenttdDiscord.Infrastructure.Servers;
 
 namespace OpenttdDiscord.Infrastructure.Statuses.Runners
 {
@@ -36,13 +37,9 @@ namespace OpenttdDiscord.Infrastructure.Statuses.Runners
             User user,
             OptionsDictionary options)
         {
-            string serverName = options.GetValueAs<string>("server-name");
-
             var _ =
                 from _0 in CheckIfHasCorrectUserLevel(user, UserLevel.Admin).ToAsync()
-                from server in ottdServerRepository.GetServerByName(
-                    command.GuildId!.Value,
-                    serverName)
+                from server in ottdServerRepository.GetSingleServer(command.GuildId!.Value)
                 from _2 in removeStatusMonitorUseCase.Execute(
                     user,
                     server.Id,

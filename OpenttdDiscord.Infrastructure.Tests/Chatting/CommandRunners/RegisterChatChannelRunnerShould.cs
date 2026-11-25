@@ -33,7 +33,6 @@ namespace OpenttdDiscord.Infrastructure.Tests.Chatting.CommandRunners
         public async Task NotExecuteForNonAdmin(UserLevel userLevel)
         {
             await WithGuildUser()
-                .WithOption("server-name", "whatever")
                 .WithUserLevel(userLevel)
                 .NotExecuteFor(
                     sut,

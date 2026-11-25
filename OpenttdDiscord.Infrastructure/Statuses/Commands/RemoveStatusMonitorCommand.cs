@@ -14,12 +14,7 @@ namespace OpenttdDiscord.Infrastructure.Statuses.Commands
         protected override void Configure(SlashCommandBuilder builder)
         {
             builder
-                .WithDescription("Removes status monitor")
-                .AddOption(new SlashCommandOptionBuilder()
-                    .WithName("server-name")
-                    .WithRequired(true)
-                    .WithDescription("Name of the server")
-                    .WithType(ApplicationCommandOptionType.String));
+                .WithDescription("Removes status monitor");
         }
     }
 }

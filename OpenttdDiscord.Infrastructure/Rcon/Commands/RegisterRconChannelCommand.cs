@@ -17,11 +17,6 @@ namespace OpenttdDiscord.Infrastructure.Rcon.Commands
                 .WithDescription("Registers channel as RCON interface. " +
                 "DO NOT use it on non-admin channel!")
                 .AddOption(new SlashCommandOptionBuilder()
-                    .WithName("server-name")
-                    .WithRequired(true)
-                    .WithDescription("Name of the server")
-                    .WithType(ApplicationCommandOptionType.String))
-                .AddOption(new SlashCommandOptionBuilder()
                     .WithName("prefix")
                     .WithRequired(true)
                     .WithDescription("Prefix that you need to use in order to execute rcon commands")

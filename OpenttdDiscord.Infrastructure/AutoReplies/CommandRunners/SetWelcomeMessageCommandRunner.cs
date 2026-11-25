@@ -37,8 +37,6 @@ namespace OpenttdDiscord.Infrastructure.AutoReplies.CommandRunners
             User user,
             OptionsDictionary options)
         {
-            string serverName = options.GetValueAs<string>("server-name");
-
             return
                 from _0 in CheckIfHasCorrectUserLevel(
                         user,
@@ -46,16 +44,13 @@ namespace OpenttdDiscord.Infrastructure.AutoReplies.CommandRunners
                     .ToAsync()
                 from guildId in EnsureItIsGuildCommand(command)
                     .ToAsync()
-                from server in getServerUseCase.Execute(
-                    serverName,
-                    guildId)
+                from server in getServerUseCase.Execute(guildId)
                 from welcomeMessage in autoReplyRepository.GetWelcomeMessage(
                     guildId,
                     server.Id)
                 select new ModalResponse(
                         new SetWelcomeMessageModal(
-                            welcomeMessage.Map(x => x.Content),
-                            serverName)) as
+                            welcomeMessage.Map(x => x.Content))) as
                     IInteractionResponse;
         }
     }

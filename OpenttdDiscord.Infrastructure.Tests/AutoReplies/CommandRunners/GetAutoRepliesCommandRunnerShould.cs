@@ -29,9 +29,7 @@ namespace OpenttdDiscord.Infrastructure.Tests.AutoReplies.CommandRunners
             defaultAutoReplies = fix.Create<List<AutoReply>>();
 
             getServerUseCaseSub
-                .Execute(
-                    defaultServerName,
-                    GuildId)
+                .Execute(GuildId)
                 .Returns(defaultServer);
 
             getAutoReplyUseCaseSub
@@ -39,10 +37,6 @@ namespace OpenttdDiscord.Infrastructure.Tests.AutoReplies.CommandRunners
                     GuildId,
                     defaultServer.Id)
                 .Returns(EitherAsync<IError, IReadOnlyCollection<AutoReply>>.Right(defaultAutoReplies));
-
-            WithOption(
-                "server-name",
-                defaultServerName);
         }
 
         [Theory]

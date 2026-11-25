@@ -2,7 +2,7 @@
 
 ## Syntax
 
-`/get-auto-reply-content server-name:{name} trigger-message:{trigger}`
+`/get-auto-reply-content trigger-message:{trigger}`
 
 ## Privilege required
 
@@ -15,4 +15,4 @@
 
 ## Description
 
-Gets message that is going to be displayed after player on server `{name}` writes a message `{trigger}`.
+Gets message that is going to be displayed after player on the registered server writes a message `{trigger}`.

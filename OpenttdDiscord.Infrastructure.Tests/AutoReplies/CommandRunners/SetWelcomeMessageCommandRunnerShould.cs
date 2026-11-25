@@ -33,9 +33,6 @@ namespace OpenttdDiscord.Infrastructure.Tests.AutoReplies.CommandRunners
         public async Task NotExecuteForNonAdmin(UserLevel userLevel)
         {
             await WithGuildUser()
-                .WithOption(
-                    "server-name",
-                    "whatever")
                 .WithUserLevel(userLevel)
                 .NotExecuteFor(
                     sut,
@@ -45,13 +42,10 @@ namespace OpenttdDiscord.Infrastructure.Tests.AutoReplies.CommandRunners
         [Fact]
         public async Task OpenAModal_WithNoneWelcomeMessage_IfItWasNotYetCreated()
         {
-            var serverName = fix.Create<string>();
             var server = fix.Create<OttdServer>();
 
             getServerUseCaseSub
-                .Execute(
-                    serverName,
-                    GuildId)
+                .Execute(GuildId)
                 .Returns(server);
 
             autoReplyRepositorySub
@@ -61,18 +55,12 @@ namespace OpenttdDiscord.Infrastructure.Tests.AutoReplies.CommandRunners
                 .Returns(Option<WelcomeMessage>.None);
 
             var result = await WithGuildUser()
-                .WithOption(
-                    "server-name",
-                    serverName)
                 .WithUserLevel(UserLevel.Admin)
                 .RunExt(sut);
 
             var value = (ModalResponse) result.Right();
             var modal = (SetWelcomeMessageModal) value.Modal;
 
-            Assert.Equal(
-                serverName,
-                modal.ServerName);
             Assert.Equal(
                 string.Empty,
                 modal.InitialWelcomeMessage);
@@ -81,14 +69,11 @@ namespace OpenttdDiscord.Infrastructure.Tests.AutoReplies.CommandRunners
         [Fact]
         public async Task OpenAModal_WithWelcomeMessage_IfWelcomeMessageIsPresent()
         {
-            var serverName = fix.Create<string>();
             var server = fix.Create<OttdServer>();
             var welcomeMessage = fix.Create<WelcomeMessage>() with { ServerId = server.Id };
 
             getServerUseCaseSub
-                .Execute(
-                    serverName,
-                    GuildId)
+                .Execute(GuildId)
                 .Returns(server);
 
             autoReplyRepositorySub
@@ -98,18 +83,12 @@ namespace OpenttdDiscord.Infrastructure.Tests.AutoReplies.CommandRunners
                 .Returns(Some(welcomeMessage));
 
             var result = await WithGuildUser()
-                .WithOption(
-                    "server-name",
-                    serverName)
                 .WithUserLevel(UserLevel.Admin)
                 .RunExt(sut);
 
             var value = (ModalResponse) result.Right();
             var modal = (SetWelcomeMessageModal) value.Modal;
 
-            Assert.Equal(
-                serverName,
-                modal.ServerName);
             Assert.Equal(
                 welcomeMessage.Content,
                 modal.InitialWelcomeMessage);

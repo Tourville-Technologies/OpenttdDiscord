@@ -21,7 +21,8 @@ COPY ./OpenttdDiscord.Validation.Tests/OpenttdDiscord.Validation.Tests.csproj ./
 #END_PUT_PROJECTS_BELOW_THIS_LINE
 
 COPY ./OpenttdDiscord.sln .
-RUN dotnet restore --disable-parallel
+RUN dotnet restore ./OpenttdDiscord.Discord/OpenttdDiscord.Discord.csproj --disable-parallel \
+    && dotnet restore ./OpenttdDiscord.Database.Migrator/OpenttdDiscord.Database.Migrator.csproj --disable-parallel
 COPY . .
 
 FROM build AS publish

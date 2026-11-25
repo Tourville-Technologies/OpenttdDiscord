@@ -14,12 +14,7 @@ namespace OpenttdDiscord.Infrastructure.Servers.Commands
         protected override void Configure(SlashCommandBuilder builder)
         {
             builder
-                .WithDescription("Removes given ottd server and all stored settings along with it")
-                .AddOption(new SlashCommandOptionBuilder()
-                    .WithName("server-name")
-                    .WithRequired(true)
-                    .WithDescription("Name of the server")
-                    .WithType(ApplicationCommandOptionType.String));
+                .WithDescription("Removes given ottd server and all stored settings along with it");
         }
     }
 }
