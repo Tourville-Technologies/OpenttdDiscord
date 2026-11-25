@@ -9,5 +9,4 @@ internal sealed record GameRequest(
     ulong UserId,
     ulong ChannelId,
     string Action,
-    int? Company,
-    string? Vote) : IGuildMessage, IOttdServerMessage;
+    int? Company) : IGuildMessage, IOttdServerMessage;

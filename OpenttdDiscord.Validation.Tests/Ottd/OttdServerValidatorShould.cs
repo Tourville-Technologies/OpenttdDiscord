@@ -51,7 +51,10 @@ namespace OpenttdDiscord.Validation.Tests.Ottd
         [InlineData("2001:db8::")]
         [InlineData("2001:0db8:0001:0000:0000:0ab9:C0A8:0102")]
         [InlineData("2001:db8:1::ab9:C0A8:102")]
-        public void AllowCorrectIpAddress(string ip)
+        [InlineData("host.docker.internal")]
+        [InlineData("openttd")]
+        [InlineData("openttd.example.com")]
+        public void AllowCorrectAddressOrHostName(string ip)
         {
             var server = correctServer with { Ip = ip };
             var result = validator.Validate(server);
@@ -77,7 +80,10 @@ namespace OpenttdDiscord.Validation.Tests.Ottd
         [InlineData("256.256.256.256")]
         [InlineData("....")]
         [InlineData(":::")]
-        public void DisallowCorrectIpAddress(string ip)
+        [InlineData("-openttd.example.com")]
+        [InlineData("openttd-.example.com")]
+        [InlineData("openttd_example.com")]
+        public void DisallowIncorrectAddressOrHostName(string ip)
         {
             var server = correctServer with { Ip = ip };
             var result = validator.Validate(server);

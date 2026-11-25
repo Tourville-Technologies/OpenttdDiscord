@@ -76,7 +76,7 @@ namespace OpenttdDiscord.Infrastructure.Statuses.Actors
             ServerStatus serverStatus = await client.QueryServerStatus();
             AdminServerInfo info = serverStatus.AdminServerInfo;
 
-            return EmbedBuilder.CreateServerStatusEmbed(client, serverStatus, info, ottdServer.Name);
+            return EmbedBuilder.CreateServerStatusEmbed(serverStatus, info);
         }
 
         private async Task UpdateMessage(Embed embed, Optional<RestUserMessage> message)

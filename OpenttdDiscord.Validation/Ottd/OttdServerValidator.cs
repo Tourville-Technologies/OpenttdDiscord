@@ -22,11 +22,33 @@ namespace OpenttdDiscord.Validation.Ottd
                 .WithMessage("Password must be provided");
 
             RuleFor(server => server.Ip)
-                .Must(ip =>
-                {
-                    return IPAddress.TryParse(ip, out var _);
-                })
-                .WithMessage("IP address must be a correct IPv4 or IPv6 address");
+                .Must(IsValidAddressOrHostName)
+                .WithMessage("Address must be a valid IPv4 address, IPv6 address, or DNS hostname");
+        }
+
+        private static bool IsValidAddressOrHostName(string address)
+        {
+            if (string.IsNullOrWhiteSpace(address) || address != address.Trim() || address.Length > 253)
+            {
+                return false;
+            }
+
+            if (IPAddress.TryParse(address, out _))
+            {
+                return true;
+            }
+
+            string[] labels = address.Split('.');
+            if (labels.All(label => label.All(char.IsDigit)))
+            {
+                return false;
+            }
+
+            return labels.All(label =>
+                label.Length is >= 1 and <= 63 &&
+                label[0] != '-' &&
+                label[^1] != '-' &&
+                label.All(character => char.IsAsciiLetterOrDigit(character) || character == '-'));
         }
     }
 }

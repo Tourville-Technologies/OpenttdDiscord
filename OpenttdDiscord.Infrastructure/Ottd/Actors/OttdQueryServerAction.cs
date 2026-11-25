@@ -32,7 +32,7 @@ namespace OpenttdDiscord.Infrastructure.Ottd.Actors
             ServerStatus serverStatus = await client.QueryServerStatus();
             AdminServerInfo info = serverStatus.AdminServerInfo;
 
-            Embed embed = embedBuilder.CreateServerStatusEmbed(client, serverStatus, info, server.Name);
+            Embed embed = embedBuilder.CreateServerStatusEmbed(serverStatus, info);
             IChannel channel = await discord.GetChannelAsync(command.ChannelId);
 
             if (channel is IMessageChannel msgChannel)

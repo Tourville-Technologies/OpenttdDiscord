@@ -24,6 +24,7 @@ namespace OpenttdDiscord.Infrastructure.Ottd
         public static IServiceCollection RegisterRunners(this IServiceCollection services)
         {
             services.AddSingleton<GameServiceControl>();
+            services.AddSingleton<IGameVoteReactions, GameVoteReactions>();
             services.AddScoped<GameCommandRunner>();
             services.AddScoped<QueryServerRunner>();
             services.AddScoped<QueryDebugInfoRunner>();

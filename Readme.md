@@ -30,21 +30,24 @@ Provides ability to integrate Discord with your OpenTTD servers.
 
 ## Discord game controls
 
-Register the dedicated server with `/register-ottd-server` using its encrypted admin port. In the Discord channel where you want game messages, run `/register-chat-channel`. The relay posts public game chat, player joins and departures, and company changes. Company and private chat stay in-game. Enable **Message Content Intent** for Discord-to-game chat and give the bot **Send Messages**, **Embed Links**, and **Attach Files** in the relevant channels.
+Register the dedicated server with `/register-ottd-server` using its encrypted admin port. In the Discord channel where you want game messages, run `/register-chat-channel`. The relay posts public game chat, player joins and departures, and company changes. Company and private chat stay in-game. Enable **Message Content Intent** for Discord-to-game chat and give the bot **Send Messages**, **Embed Links**, **Attach Files**, **Add Reactions**, and **Read Message History** in the relevant channels.
 
 | Command | Result |
 | --- | --- |
 | `/game status` | Shows the registered server's map, game date, players, and live pause state. |
-| `/game profit` | Uses the same quarterly operating profit as OpenTTD's Operating Profit graph. Shows all companies on one graph by default. Pass `company-id` to show one company. Open the SVG attachment in a browser to view it. |
+| `/game profit` | Uses the same quarterly operating profit, scale, dates, and company colours as OpenTTD's Operating Profit graph. Shows all companies in one PNG by default. Pass `company-id` to show one company. |
 | `/game link` | Gives you a private, one-use code to enter in OpenTTD's **All** chat. |
 | `/game my-profit` | Graphs the companies your linked OpenTTD clients are currently playing in. Run `/game link` again when you reconnect. |
 | `/game reset-password` | Clears the password for the company your linked OpenTTD client currently plays in. Specify `company` if your linked clients play in multiple companies. Set a new password in OpenTTD. |
-| `/game unpause` | Opens a five-minute vote after at least one player joins the paused game. Use the same command with `vote:Yes` or `vote:No` to cast or change your vote. The vote passes if at least 50% of votes cast are yes when the poll closes. The bot posts the result in the channel where the vote opened. |
+| `/game unpause` | Opens a five-minute vote after at least one player joins the paused game. React to the vote message with ✅ or ❌; your latest reaction is your ballot. The vote passes if at least 50% of votes cast are ✅ when the poll closes. |
 | `/game-admin start`, `stop`, `restart` | Runs the configured service command on the bot host. |
+| `/game-admin admin-role` | Allows the selected Discord role to run `/game-admin` commands. Discord Administrators can always use them. |
 | `/game-admin ping-role` | Saves the Discord role to ping once when a vote opens for this server. Omit `role` to clear it. |
 | `/game-admin clear-password` | Removes an existing human company's password. The company stays in the game, and its players can set a new password in OpenTTD. |
 
-Commands use the single OpenTTD server registered for the Discord server. Register it once with `/register-ottd-server`. The `/game-admin` group requires Discord **Administrator** permission. The configured role must be mentionable or the bot must have permission to mention all roles in the vote channel.
+Commands use the single OpenTTD server registered for the Discord server. Register it once with `/register-ottd-server`. The `/game-admin` group requires Discord **Administrator** permission or a role configured with `/game-admin admin-role`. The vote-ping role must be mentionable or the bot must have permission to mention all roles in the vote channel.
+
+Status, profit, my-profit, and unpause-vote messages are visible to the channel. Account-link codes, password-reset results, and all `/game-admin` responses are visible only to the person who ran the command.
 
 ### Dedicated server patch
 
@@ -56,7 +59,7 @@ cmake -S . -B build-discord -DOPTION_DEDICATED=ON
 cmake --build build-discord --parallel
 ```
 
-Set `min_active_clients = 0` and `pause_on_join = false` in the server's `[network]` configuration so the vote controls resuming after the server empties. The patched server disconnects players and spectators after 15 minutes without an in-game command, chat message, or company move. Camera movement and network keepalives do not count as activity. The game pauses when the last player leaves, including after an AFK disconnect, and players can join while it is paused. Basic status and public chat also work with servers that do not have the patch.
+Set `min_active_clients = 0` in the server's `[network]` configuration so the Discord vote controls resuming after the server empties. Both `pause_on_join = true` and `pause_on_join = false` are supported. With pause-on-join enabled, an approved Discord vote removes the bot's pause while OpenTTD keeps the game paused until connecting clients finish joining. The patched server disconnects players and spectators after 15 minutes without an in-game command, chat message, or company move. Camera movement and network keepalives do not count as activity. The game pauses when the last player leaves, including after an AFK disconnect, and players can join while it is paused. Basic status and public chat also work with servers that do not have the patch.
 
 ### Start, stop, and restart configuration
 
@@ -90,7 +93,10 @@ For a direct .NET 10 run, set `Discord__Token` and `Database__ConnectionString` 
 
 - View channels
 - Send Messages
-- Embed files
+- Embed Links
+- Attach Files
+- Add Reactions
+- Read Message History
 
 Read more about permissions in [official Discord documentation](https://discord.com/developers/docs/topics/permissions)
 

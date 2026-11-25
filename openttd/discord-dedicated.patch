@@ -87,7 +87,7 @@
  void NetworkDisconnect(bool close_admins = true);
 --- a/src/network/network.cpp
 +++ b/src/network/network.cpp
-@@ -552,6 +552,61 @@
+@@ -552,6 +552,63 @@
  	return count;
  }
  
@@ -124,6 +124,8 @@
 +	auto other_pauses = _pause_mode;
 +	other_pauses.Reset(PauseMode::Normal);
 +	other_pauses.Reset(PauseMode::CommandDuringPause);
++	/* pause_on_join is temporary. Keep it set, but let an approved vote clear our pause. */
++	other_pauses.Reset(PauseMode::Join);
 +	if (other_pauses.Any()) return "blocked";
 +
 +	discord_waiting_for_vote = false;
@@ -149,7 +151,7 @@
  /**
   * Check if the minimum number of active clients has been reached and pause or unpause the game as appropriate
   */
-@@ -1075,6 +1130,9 @@
+@@ -1075,6 +1132,9 @@
  	_record_sync_records = false;
  
  	_network_clients_connected = 0;
@@ -159,7 +161,7 @@
  	_network_company_passworded = {};
  
  	NetworkInitGameInfo();
-@@ -1457,6 +1515,7 @@
+@@ -1457,6 +1517,7 @@
  			 * the frame_freq is more than 1 tick. Same with distributing commands. */
  			CheckPauseOnJoin();
  			CheckMinActiveClients();
@@ -169,7 +171,15 @@
  
 --- a/src/console_cmds.cpp
 +++ b/src/console_cmds.cpp
-@@ -929,6 +929,63 @@
+@@ -31,6 +31,7 @@
+ #include "fontcache.h"
+ #include "screenshot.h"
+ #include "genworld.h"
++#include "gfx_func.h"
+ #include "string_func.h"
+ #include "strings_func.h"
+ #include "viewport_func.h"
+@@ -929,6 +930,66 @@
  	return true;
  }
  
@@ -178,7 +188,8 @@
 +{
 +	if (argv.size() != 2 && (argv.size() != 3 || argv[2] != "state")) return false;
 +
-+	IConsolePrint(CC_DEFAULT, "OTTD_DISCORD {} state {} {} {}", argv[1], NetworkDiscordPauseState(), NetworkDiscordClientCount(), NetworkDiscordPauseGeneration());
++	IConsolePrint(CC_DEFAULT, "OTTD_DISCORD {} state {} {} {} {} {}", argv[1], NetworkDiscordPauseState(), NetworkDiscordClientCount(),
++		NetworkDiscordPauseGeneration(), EconTime::CurYear().base(), EconTime::CurMonth());
 +	if (argv.size() == 2) {
 +		for (const Company *c : Company::Iterate()) {
 +			fmt::memory_buffer profits;
@@ -186,8 +197,10 @@
 +				const auto &quarter = c->old_economy[i];
 +				fmt::format_to(std::back_inserter(profits), "{}{}", i == 0 ? "" : ",", (int64_t)(quarter.income + quarter.expenses));
 +			}
-+			IConsolePrint(CC_DEFAULT, "OTTD_DISCORD {} company {}|{}|{}", argv[1], c->index + 1,
-+				std::string_view(profits.data(), profits.size()), GetString(STR_COMPANY_NAME, c->index));
++			const PixelColour pixel = GetCompanyPixelColour(c->index, Shade::Normal);
++			const Colour colour = pixel.rgb != 0 ? Colour(pixel.rgb) : _cur_palette.palette[pixel.p];
++			IConsolePrint(CC_DEFAULT, "OTTD_DISCORD {} company {}|{}|{:02X}{:02X}{:02X}|{}", argv[1], c->index + 1,
++				std::string_view(profits.data(), profits.size()), colour.r, colour.g, colour.b, GetString(STR_COMPANY_NAME, c->index));
 +		}
 +	}
 +	IConsolePrint(CC_DEFAULT, "OTTD_DISCORD {} end", argv[1]);
@@ -233,7 +246,7 @@
  /** Manually pause the game. @copydoc IConsoleCmdProc */
  static bool ConPauseGame(std::span<std::string_view> argv)
  {
-@@ -4578,6 +4635,9 @@
+@@ -4578,6 +4639,9 @@
  
  	IConsole::CmdRegister("connect",                 ConNetworkConnect,   ConHookClientOnly);
  	IConsole::CmdRegister("clients",                 ConNetworkClients,   ConHookNeedNetwork);

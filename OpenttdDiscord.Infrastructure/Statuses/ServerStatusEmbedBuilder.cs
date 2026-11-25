@@ -6,7 +6,7 @@ namespace OpenttdDiscord.Infrastructure.Statuses
 {
     public class ServerStatusEmbedBuilder
     {
-        public Embed CreateServerStatusEmbed(IAdminPortClient client, ServerStatus serverStatus, AdminServerInfo info, string serverName)
+        public Embed CreateServerStatusEmbed(ServerStatus serverStatus, AdminServerInfo info)
         {
             string mapName = string.IsNullOrEmpty(info.MapName) ? "Random map" : info.MapName;
 
@@ -20,7 +20,6 @@ namespace OpenttdDiscord.Infrastructure.Statuses
 
             embedBuilder.AddField("Map Name", mapName, true);
             embedBuilder.AddField("Climate", info.Landscape.ToHumanReadable(), true);
-            embedBuilder.AddField("Server address", $"{client.ServerInfo.ServerIp}", true);
 
             string players = string.Join('\n', clients.Select(player => player.Name));
             if (players.Length > 1024)

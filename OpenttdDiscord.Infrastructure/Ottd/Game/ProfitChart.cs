@@ -1,136 +1,224 @@
 using System.Globalization;
-using System.Security;
-using System.Text;
 
 namespace OpenttdDiscord.Infrastructure.Ottd.Game;
 
 internal static class ProfitChart
 {
-    private const int Width = 1000;
-    private const int PlotLeft = 90;
-    private const int PlotRight = 970;
-    private const int PlotTop = 72;
-    private const int PlotBottom = 410;
+    private const int Width = 1152;
+    private const int PlotLeft = 112;
+    private const int PlotRight = 1120;
+    private const int PlotTop = 52;
+    private const int PlotBottom = 372;
+    private const int QuarterSlots = 24;
+    private const int HorizontalLines = 8;
 
-    public static Stream Render(IReadOnlyList<CompanyProfit> companies)
+    private static readonly Rgb[] FallbackCompanyColours =
     {
-        const int legendColumns = 3;
-        const int legendTop = 470;
-        const int legendRowHeight = 24;
-        int rows = (companies.Count + legendColumns - 1) / legendColumns;
-        int height = legendTop + (rows * legendRowHeight) + 16;
+        new(0, 72, 184), new(104, 160, 64), new(204, 104, 124), new(232, 184, 16),
+        new(196, 0, 0), new(56, 144, 232), new(84, 132, 20), new(44, 68, 32),
+        new(24, 120, 220), new(212, 188, 148), new(132, 132, 164), new(112, 68, 168),
+        new(252, 136, 0), new(124, 84, 44), new(168, 168, 168), new(252, 252, 252),
+    };
 
-        var values = companies.SelectMany(company => company.Quarters).DefaultIfEmpty(0).ToArray();
-        decimal high = Math.Max(0, values.Max());
-        decimal low = Math.Min(0, values.Min());
-        if (high == low)
-        {
-            high = 1;
-            low = -1;
-        }
+    public static Stream Render(IReadOnlyList<CompanyProfit> companies, int currentYear = 0, int currentMonth = 0)
+    {
+        const int legendColumns = 4;
+        int legendRows = Math.Max(1, (companies.Count + legendColumns - 1) / legendColumns);
+        int height = 420 + (legendRows * 22);
+        var image = new PngCanvas(Width, height, new Rgb(156, 140, 96));
 
-        int quarterCount = companies.Select(company => company.Quarters.Count).DefaultIfEmpty(0).Max();
-        var svg = new StringBuilder();
-        svg.Append(CultureInfo.InvariantCulture, $"<svg xmlns='http://www.w3.org/2000/svg' width='{Width}' height='{height}' viewBox='0 0 {Width} {height}' role='img'>");
-        svg.Append("<title>OpenTTD company operating profit</title><rect width='100%' height='100%' fill='#111827'/>");
-        svg.Append("<g fill='#f8fafc' font-family='system-ui,sans-serif'><text x='20' y='30' font-size='20' font-weight='700'>Company operating profit</text>");
-        svg.Append("<text x='20' y='51' font-size='12' fill='#a9b8cc'>Completed quarters · OpenTTD base currency</text>");
-        DrawAxes(svg, quarterCount, low, high);
+        DrawWindow(image, height);
+        var interval = GetInterval(companies);
+        DrawAxes(image, interval, currentYear, currentMonth);
 
+        int quarterCount = Math.Min(QuarterSlots, companies.Select(company => company.Quarters.Count).DefaultIfEmpty(0).Max());
         for (int index = 0; index < companies.Count; index++)
         {
-            var company = companies[index];
-            string name = SecurityElement.Escape(company.Name) ?? string.Empty;
-            int hue = (index * 137) % 360;
-            int style = index / 12;
-            int lightness = 64 + ((style % 3) * 8);
-            string color = FormattableString.Invariant($"hsl({hue},76%,{lightness}%)");
-            string dash = (style % 4) switch
-            {
-                1 => "8 4",
-                2 => "3 4",
-                3 => "10 3 2 3",
-                _ => "none",
-            };
-
-            DrawCompany(svg, company, quarterCount, low, high, color, dash, name);
-
-            int legendX = 24 + ((index % legendColumns) * 326);
-            int legendY = legendTop + ((index / legendColumns) * legendRowHeight);
-            string label = SecurityElement.Escape(string.Concat(company.Name.EnumerateRunes().Take(28))) ?? string.Empty;
-            string suffix = company.Quarters.Count == 0 ? " · no data" : string.Empty;
-            svg.Append(CultureInfo.InvariantCulture,
-                $"<g transform='translate({legendX} {legendY})'><title>#{company.Id} {name}{suffix}</title>" +
-                $"<path d='M0 -4H24' stroke='{color}' stroke-width='3' stroke-dasharray='{dash}'/>" +
-                $"<text x='32' font-size='12'>#{company.Id} {label}{suffix}</text></g>");
+            Rgb colour = CompanyColour(companies[index], index);
+            DrawCompany(image, companies[index], interval, colour);
+            DrawLegendItem(image, companies[index], index, legendColumns, colour);
         }
 
-        svg.Append("</g></svg>");
-        return new MemoryStream(Encoding.UTF8.GetBytes(svg.ToString()), writable: false);
-    }
-
-    private static void DrawAxes(StringBuilder svg, int quarterCount, decimal low, decimal high)
-    {
-        svg.Append(CultureInfo.InvariantCulture,
-            $"<rect x='{PlotLeft}' y='{PlotTop}' width='{PlotRight - PlotLeft}' height='{PlotBottom - PlotTop}' fill='#182235'/>");
-
-        for (int tick = 0; tick <= 4; tick++)
-        {
-            decimal value = high - (((high - low) * tick) / 4);
-            decimal y = ChartY(value, low, high);
-            svg.Append(CultureInfo.InvariantCulture,
-                $"<path d='M{PlotLeft} {y:F2}H{PlotRight}' stroke='#334155'/>" +
-                $"<text x='{PlotLeft - 10}' y='{y + 4:F2}' font-size='12' text-anchor='end'>{Label(value)}</text>");
-        }
-
-        svg.Append(CultureInfo.InvariantCulture,
-            $"<path d='M{PlotLeft} {ChartY(0, low, high):F2}H{PlotRight}' stroke='#94a3b8' stroke-dasharray='4 4'/>");
         if (quarterCount == 0)
         {
-            svg.Append("<text x='530' y='240' text-anchor='middle' fill='#a9b8cc'>No completed quarters</text>");
+            image.DrawTextCentered((PlotLeft + PlotRight) / 2, 205, "NO COMPLETED QUARTERS", new Rgb(168, 168, 168), 2);
+        }
+
+        return image.EncodePng();
+    }
+
+    private static void DrawWindow(PngCanvas image, int height)
+    {
+        var borderLight = new Rgb(220, 204, 152);
+        var borderDark = new Rgb(76, 68, 44);
+        image.FillRectangle(0, 0, Width, 32, new Rgb(112, 92, 48));
+        image.FillRectangle(4, 4, Width - 8, 24, new Rgb(156, 140, 96));
+        image.DrawRectangle(3, 3, Width - 6, height - 6, borderLight, borderDark);
+        image.DrawTextCentered(Width / 2, 8, "OPERATING PROFIT GRAPH", Rgb.White, 2, Rgb.Black);
+        image.DrawText(PlotRight - 45, 10, "KEY", Rgb.Black, 1);
+        image.FillRectangle(PlotLeft, PlotTop, PlotRight - PlotLeft, PlotBottom - PlotTop, new Rgb(32, 32, 32));
+    }
+
+    private static void DrawAxes(PngCanvas image, GraphInterval interval, int currentYear, int currentMonth)
+    {
+        int xStep = (PlotRight - PlotLeft) / QuarterSlots;
+        int yStep = (PlotBottom - PlotTop) / HorizontalLines;
+        var grid = new Rgb(48, 48, 48);
+        var yearGrid = new Rgb(82, 80, 82);
+
+        int firstMonth = 0;
+        int firstYear = 0;
+        if (currentYear != 0)
+        {
+            firstMonth = ((currentMonth / 3) - QuarterSlots) * 3;
+            firstYear = currentYear;
+            while (firstMonth < 0)
+            {
+                firstMonth += 12;
+                firstYear--;
+            }
+        }
+
+        int month = firstMonth;
+        int year = firstYear;
+        string[] months = { "JAN", "APR", "JUL", "OCT" };
+        for (int slot = 0; slot <= QuarterSlots; slot++)
+        {
+            int x = PlotLeft + (slot * xStep);
+            bool yearBoundary = currentYear != 0 && month == 0;
+            image.FillRectangle(x, PlotTop, 1, PlotBottom - PlotTop, yearBoundary ? yearGrid : grid);
+            if (slot < QuarterSlots)
+            {
+                string quarterLabel = currentYear == 0 ? $"-{QuarterSlots - slot}Q" : months[month / 3];
+                image.DrawText(x + 2, PlotBottom + 6, quarterLabel, Rgb.Black, 1);
+                if (currentYear != 0 && month == 0)
+                {
+                    image.DrawText(x + 2, PlotBottom + 14, year.ToString(CultureInfo.InvariantCulture), Rgb.Black, 1);
+                }
+
+                month += 3;
+                if (month >= 12)
+                {
+                    month = 0;
+                    year++;
+                }
+            }
+        }
+
+        long label = interval.High;
+        for (int line = 0; line <= HorizontalLines; line++)
+        {
+            int y = PlotTop + (line * yStep);
+            Rgb colour = label == 0 ? new Rgb(148, 149, 148) : grid;
+            image.FillRectangle(PlotLeft, y, PlotRight - PlotLeft, label == 0 ? 2 : 1, colour);
+            string text = CurrencyLabel(label);
+            int textWidth = image.MeasureText(text, 1);
+            image.DrawText(PlotLeft - textWidth - 8, y - 3, text, label < 0 ? new Rgb(252, 52, 52) : Rgb.Black, 1);
+            label -= interval.Step;
+        }
+    }
+
+    private static void DrawCompany(PngCanvas image, CompanyProfit company, GraphInterval interval, Rgb colour)
+    {
+        int count = Math.Min(QuarterSlots, company.Quarters.Count);
+        if (count == 0)
+        {
             return;
         }
 
-        if (quarterCount > 1)
+        int xStep = (PlotRight - PlotLeft) / QuarterSlots;
+        var values = company.Quarters.Take(count).Reverse().ToArray();
+        int firstSlot = QuarterSlots - values.Length;
+        int previousX = -1;
+        int previousY = -1;
+        for (int index = 0; index < values.Length; index++)
         {
-            svg.Append(CultureInfo.InvariantCulture, $"<text x='{PlotLeft}' y='436' font-size='12'>{quarterCount} quarters ago</text>");
-        }
+            int x = PlotLeft + ((firstSlot + index) * xStep) + (xStep / 2);
+            int y = PlotTop + checked((int)Math.Round((interval.High - (decimal)values[index]) * (PlotBottom - PlotTop) / interval.Size));
+            image.FillRectangle(x - 2, y - 2, 5, 5, colour);
+            if (previousX >= 0)
+            {
+                image.DrawLine(previousX, previousY, x, y, colour, 3);
+            }
 
-        svg.Append(CultureInfo.InvariantCulture, $"<text x='{PlotRight}' y='436' font-size='12' text-anchor='end'>Latest quarter</text>");
+            previousX = x;
+            previousY = y;
+        }
     }
 
-    private static void DrawCompany(StringBuilder svg, CompanyProfit company, int quarterCount, decimal low, decimal high, string color, string dash, string name)
+    private static void DrawLegendItem(PngCanvas image, CompanyProfit company, int index, int columns, Rgb colour)
     {
-        if (company.Quarters.Count == 0)
-        {
-            return;
-        }
-
-        var points = company.Quarters.Select((value, age) =>
-        {
-            decimal x = PlotRight - (((PlotRight - PlotLeft) * (decimal)age) / Math.Max(1, quarterCount - 1));
-            return FormattableString.Invariant($"{x:F2},{ChartY(value, low, high):F2}");
-        }).Reverse();
-        svg.Append(CultureInfo.InvariantCulture,
-            $"<polyline points='{string.Join(' ', points)}' fill='none' stroke='{color}' stroke-width='2.5' stroke-dasharray='{dash}'>" +
-            $"<title>#{company.Id} {name}</title></polyline>" +
-            $"<circle cx='{PlotRight}' cy='{ChartY(company.Quarters[0], low, high):F2}' r='3' fill='{color}'>" +
-            $"<title>#{company.Id} {name} · Latest quarter {company.Quarters[0]:N0}</title></circle>");
+        int columnWidth = (Width - 32) / columns;
+        int x = 20 + ((index % columns) * columnWidth);
+        int y = 414 + ((index / columns) * 22);
+        image.FillRectangle(x, y, 18, 8, colour);
+        string name = company.Name.Length > 25 ? company.Name[..25] : company.Name;
+        string suffix = company.Quarters.Count == 0 ? " (NO DATA)" : string.Empty;
+        image.DrawText(x + 25, y + 1, $"#{company.Id} {name}{suffix}", Rgb.Black, 1);
     }
 
-    private static decimal ChartY(decimal value, decimal low, decimal high)
-        => PlotBottom - (((value - low) / (high - low)) * (PlotBottom - PlotTop));
-
-    private static string Label(decimal value)
+    private static GraphInterval GetInterval(IReadOnlyList<CompanyProfit> companies)
     {
-        return Math.Abs(value) switch
+        var values = companies.SelectMany(company => company.Quarters.Take(QuarterSlots)).DefaultIfEmpty(0L).ToArray();
+        double positive = Math.Max(0, values.Max()) * 1.1;
+        double negative = Math.Max(0, -(double)values.Min()) * 1.1;
+        int positiveLines;
+        long step;
+
+        if (positive == 0 && negative == 0)
         {
-            >= 1_000_000_000_000_000 => FormattableString.Invariant($"{value / 1_000_000_000_000_000:0.##}Q"),
-            >= 1_000_000_000_000 => FormattableString.Invariant($"{value / 1_000_000_000_000:0.##}T"),
-            >= 1_000_000_000 => FormattableString.Invariant($"{value / 1_000_000_000:0.##}B"),
-            >= 1_000_000 => FormattableString.Invariant($"{value / 1_000_000:0.##}M"),
-            >= 1_000 => FormattableString.Invariant($"{value / 1_000:0.##}K"),
-            _ => value.ToString("0.##", CultureInfo.InvariantCulture),
+            positiveLines = HorizontalLines / 2;
+            step = 1;
+        }
+        else
+        {
+            positiveLines = (int)Math.Floor(0.5 + (HorizontalLines * positive / (positive + negative)));
+            if (positive > 0 && positiveLines == 0)
+            {
+                positiveLines++;
+            }
+
+            if (negative > 0 && positiveLines == HorizontalLines)
+            {
+                positiveLines--;
+            }
+
+            long positiveStep = positive > 0 ? checked((long)Math.Ceiling(positive / positiveLines)) : 0;
+            int negativeLines = HorizontalLines - positiveLines;
+            long negativeStep = negative > 0 ? checked((long)Math.Ceiling(negative / negativeLines)) : 0;
+            step = Math.Max(1, Math.Max(positiveStep, negativeStep));
+        }
+
+        long high = positiveLines * step;
+        long low = -(HorizontalLines - positiveLines) * step;
+        return new GraphInterval(high, low, step);
+    }
+
+    private static Rgb CompanyColour(CompanyProfit company, int index)
+    {
+        if (company.Colour != 0)
+        {
+            return new Rgb((byte)(company.Colour >> 16), (byte)(company.Colour >> 8), (byte)company.Colour);
+        }
+
+        return FallbackCompanyColours[index % FallbackCompanyColours.Length];
+    }
+
+    private static string CurrencyLabel(long value)
+    {
+        decimal absolute = Math.Abs((decimal)value);
+        return absolute switch
+        {
+            >= 1_000_000_000_000 => $"${value / 1_000_000_000_000M:0.##}T",
+            >= 1_000_000_000 => $"${value / 1_000_000_000M:0.##}B",
+            >= 1_000_000 => $"${value / 1_000_000M:0.##}M",
+            >= 1_000 => $"${value / 1_000M:0.##}K",
+            _ => $"${value.ToString(CultureInfo.InvariantCulture)}",
         };
+    }
+
+    private readonly record struct GraphInterval(long High, long Low, long Step)
+    {
+        public decimal Size => High - (decimal)Low;
     }
 }

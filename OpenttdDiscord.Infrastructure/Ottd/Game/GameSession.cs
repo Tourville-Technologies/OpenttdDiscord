@@ -18,14 +18,14 @@ internal sealed class GameSession(IAdminPortClient client)
     private readonly Dictionary<ulong, bool> votes = new();
 
     private DateTimeOffset voteEnds;
-    private Guid voteId;
+    private Guid voteId = Guid.Empty;
     private ulong voteGeneration;
 
     public void Clear()
     {
         linkedClients.Clear();
         linkCodes.Clear();
-        votes.Clear();
+        ClearVote();
     }
 
     public void Disconnect(uint clientId)
@@ -86,14 +86,14 @@ internal sealed class GameSession(IAdminPortClient client)
 
             case "unpause":
             {
-                return Vote(request, snapshot.State, snapshot.Clients, snapshot.Generation);
+                return OpenVote(snapshot.State, snapshot.Clients, snapshot.Generation);
             }
 
             case "profit":
             {
                 return request.Company is { } companyId
-                    ? Profits(snapshot.Companies.Where(company => company.Id == companyId).ToArray())
-                    : Profits(snapshot.Companies);
+                    ? Profits(snapshot.Companies.Where(company => company.Id == companyId).ToArray(), snapshot.Year, snapshot.Month)
+                    : Profits(snapshot.Companies, snapshot.Year, snapshot.Month);
             }
 
             case "my-profit":
@@ -102,7 +102,7 @@ internal sealed class GameSession(IAdminPortClient client)
                 var companies = players.Select(player => player.PlayingAs + 1).ToHashSet();
                 return companies.Count == 0
                     ? new GameReply("Use `/game link` to link your current OpenTTD session, then join a company.")
-                    : Profits(snapshot.Companies.Where(company => companies.Contains(company.Id)).ToArray());
+                    : Profits(snapshot.Companies.Where(company => companies.Contains(company.Id)).ToArray(), snapshot.Year, snapshot.Month);
             }
 
             default:
@@ -158,7 +158,7 @@ internal sealed class GameSession(IAdminPortClient client)
     private async Task<GameReply> Status()
     {
         var status = await client.QueryServerStatus();
-        var embed = new ServerStatusEmbedBuilder().CreateServerStatusEmbed(client, status, status.AdminServerInfo, status.AdminServerInfo.ServerName);
+        var embed = new ServerStatusEmbedBuilder().CreateServerStatusEmbed(status, status.AdminServerInfo);
         try
         {
             var snapshot = await console.Snapshot(includeCompanies: false);
@@ -192,14 +192,20 @@ internal sealed class GameSession(IAdminPortClient client)
 
     public async Task<GameReply?> FinishVote(Guid id)
     {
-        if (votes.Count == 0 || id != voteId)
+        if (id != voteId)
         {
             return null;
         }
 
         int yes = votes.Values.Count(vote => vote);
         int no = votes.Count - yes;
+        voteId = Guid.Empty;
         votes.Clear();
+
+        if (yes + no == 0)
+        {
+            return new GameReply("Unpause vote did not pass because no votes were cast.");
+        }
 
         if (yes < no)
         {
@@ -222,12 +228,20 @@ internal sealed class GameSession(IAdminPortClient client)
         };
     }
 
-    private GameReply Vote(GameRequest request, string state, int clients, ulong generation)
+    public void RecordVote(Guid id, ulong userId, bool unpause)
+    {
+        if (id == voteId && DateTimeOffset.UtcNow < voteEnds)
+        {
+            votes[userId] = unpause;
+        }
+    }
+
+    private GameReply OpenVote(string state, int clients, ulong generation)
     {
         DateTimeOffset now = DateTimeOffset.UtcNow;
         if (state != "vote" || clients == 0 || generation != voteGeneration)
         {
-            votes.Clear();
+            ClearVote();
         }
 
         if (state != "vote")
@@ -240,36 +254,39 @@ internal sealed class GameSession(IAdminPortClient client)
             return new GameReply("Join the paused game before opening an unpause vote.");
         }
 
-        if (votes.Count != 0 && now >= voteEnds)
+        if (voteId != Guid.Empty && now >= voteEnds)
         {
             return new GameReply("Voting has closed. The bot is counting the votes.");
         }
 
-        Guid? opened = null;
-        if (votes.Count == 0)
+        if (voteId != Guid.Empty)
         {
-            if (request.Vote == "no")
-            {
-                return new GameReply("There is no active vote. Run `/game unpause` to open one.");
-            }
-
-            voteEnds = now + VoteDuration;
-            voteGeneration = generation;
-            voteId = Guid.NewGuid();
-            opened = voteId;
+            return new GameReply($"An unpause vote is already open and closes <t:{voteEnds.ToUnixTimeSeconds()}:R>.");
         }
 
-        votes[request.UserId] = request.Vote != "no";
-        int yes = votes.Values.Count(vote => vote);
-        int no = votes.Count - yes;
+        voteEnds = now + VoteDuration;
+        voteGeneration = generation;
+        voteId = Guid.NewGuid();
+        votes.Clear();
         return new GameReply(
-            $"Unpause vote · **{yes} yes / {no} no** · closes <t:{voteEnds.ToUnixTimeSeconds()}:R>. Use `/game unpause` with a yes or no vote. The vote passes if at least 50% of votes cast are yes.") { OpenedVote = opened };
+            $"Unpause vote closes <t:{voteEnds.ToUnixTimeSeconds()}:R>. React with ✅ to unpause or ❌ to keep the game paused. The vote passes if at least 50% of votes cast are ✅.") { OpenedVote = voteId };
     }
 
-    private static GameReply Profits(IReadOnlyList<CompanyProfit> companies)
+    private void ClearVote()
+    {
+        voteId = Guid.Empty;
+        votes.Clear();
+    }
+
+    private static GameReply Profits(IReadOnlyList<CompanyProfit> companies, int year, int month)
     {
         return companies.Count == 0
             ? new GameReply("No matching companies are available.")
-            : new GameReply("Operating profit by completed quarter, in OpenTTD base currency.") { Profits = companies };
+            : new GameReply("Operating profit by completed quarter, in OpenTTD base currency.")
+            {
+                Profits = companies,
+                ProfitYear = year,
+                ProfitMonth = month,
+            };
     }
 }

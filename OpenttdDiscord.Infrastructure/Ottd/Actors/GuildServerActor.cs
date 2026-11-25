@@ -91,6 +91,7 @@ namespace OpenttdDiscord.Infrastructure.Ottd.Actors
 
             Receive<KillDanglingActor>(msg => msg.commandActor.GracefulStop(TimeSpan.FromSeconds(1)));
             ReceiveAsync<GameRequest>(HandleGameRequest);
+            Receive<GameVoteReaction>(reaction => game.RecordVote(reaction.VoteId, reaction.UserId, reaction.Unpause));
             ReceiveAsync<CloseGameVote>(FinishGameVote);
             ReceiveAsync<AdminServerConnectionLost>(ReconnectSecure);
             Receive<IAdminEvent>(HandleAdminEvent);
@@ -205,6 +206,7 @@ namespace OpenttdDiscord.Infrastructure.Ottd.Actors
 
         private async Task FinishGameVote(CloseGameVote vote)
         {
+            SP.GetRequiredService<IGameVoteReactions>().Close(vote.Id);
             GameReply? result;
             try
             {

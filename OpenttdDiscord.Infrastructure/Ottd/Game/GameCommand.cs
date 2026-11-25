@@ -10,11 +10,12 @@ internal sealed class GameCommand(bool admin) : OttdSlashCommandBase<GameCommand
         if (admin)
         {
             builder.WithDescription("Manage an OpenTTD server")
-                .WithDefaultMemberPermissions(GuildPermission.Administrator)
                 .AddOption(Subcommand("start", "Start the configured OpenTTD service"))
                 .AddOption(Subcommand("stop", "Stop the configured OpenTTD service"))
                 .AddOption(Subcommand("restart", "Restart the configured OpenTTD service"))
                 .AddOption(Subcommand("clear-password", "Remove a company's password").AddOption(CompanyOption(true)))
+                .AddOption(Subcommand("admin-role", "Allow a Discord role to use game administration commands")
+                    .AddOption("role", ApplicationCommandOptionType.Role, "Role allowed to administer the game.", isRequired: true))
                 .AddOption(Subcommand("ping-role", "Set or clear the role notified when an unpause vote opens")
                     .AddOption("role", ApplicationCommandOptionType.Role, "Role to ping. Omit this option to clear the saved role."));
             return;
@@ -27,13 +28,7 @@ internal sealed class GameCommand(bool admin) : OttdSlashCommandBase<GameCommand
             .AddOption(Subcommand("my-profit", "Get the profit graphs for companies your linked clients play in"))
             .AddOption(Subcommand("link", "Link your current OpenTTD client to Discord"))
             .AddOption(Subcommand("reset-password", "Clear the password for a company your linked client plays in").AddOption(CompanyOption(false)))
-            .AddOption(Subcommand("unpause", "Open or vote in a poll to unpause the game")
-                .AddOption(new SlashCommandOptionBuilder()
-                    .WithName("vote")
-                    .WithDescription("Vote yes to open the poll or yes/no to cast your vote")
-                    .WithType(ApplicationCommandOptionType.String)
-                    .AddChoice("Yes", "yes")
-                    .AddChoice("No", "no")));
+            .AddOption(Subcommand("unpause", "Open a reaction poll to unpause the game"));
     }
 
     private static SlashCommandOptionBuilder Subcommand(string name, string description)

@@ -40,10 +40,12 @@ public class GameSessionShould
         long closingTime = long.Parse(open.Text[timestampStart..].Split(':')[0], System.Globalization.CultureInfo.InvariantCulture);
         Assert.InRange(closingTime, earliestClose, latestClose);
 
+        session.RecordVote(open.OpenedVote!.Value, 1, true);
         var updated = await session.Execute(Vote(1));
         Assert.Null(updated.OpenedVote);
-        await session.Execute(Vote(2, "no"));
-        await session.Execute(Vote(3, "no"));
+        session.RecordVote(open.OpenedVote.Value, 1, false);
+        session.RecordVote(open.OpenedVote.Value, 2, false);
+        session.RecordVote(open.OpenedVote.Value, 3, true);
 
         var result = await session.FinishVote(open.OpenedVote!.Value);
 
@@ -57,9 +59,10 @@ public class GameSessionShould
     public async Task ResumeWhenAtLeastHalfOfVotesAreYes(int noVotes)
     {
         var open = await session.Execute(Vote(1));
+        session.RecordVote(open.OpenedVote!.Value, 1, true);
         for (int index = 0; index < noVotes; index++)
         {
-            await session.Execute(Vote((ulong)index + 2, "no"));
+            session.RecordVote(open.OpenedVote.Value, (ulong)index + 2, false);
         }
 
         Assert.Equal(0, resumes);
@@ -67,6 +70,17 @@ public class GameSessionShould
 
         Assert.Contains("Vote passed", result!.Text);
         Assert.Equal(1, resumes);
+    }
+
+    [Fact]
+    public async Task KeepTheGamePausedWhenNobodyVotes()
+    {
+        var open = await session.Execute(Vote(1));
+
+        var result = await session.FinishVote(open.OpenedVote!.Value);
+
+        Assert.Contains("no votes were cast", result!.Text);
+        Assert.Equal(0, resumes);
     }
 
     [Fact]
@@ -89,7 +103,8 @@ public class GameSessionShould
     public async Task RejectAnApprovedVoteFromBeforeTheServerEmptied()
     {
         var open = await session.Execute(Vote(1));
-        await session.Execute(Vote(2));
+        session.RecordVote(open.OpenedVote!.Value, 1, true);
+        session.RecordVote(open.OpenedVote.Value, 2, true);
         generation++;
 
         var result = await session.FinishVote(open.OpenedVote!.Value);
@@ -172,8 +187,8 @@ public class GameSessionShould
             player, ChatDestination.DESTTYPE_BROADCAST, NetworkAction.NETWORK_ACTION_SERVER_MESSAGE, code)));
     }
 
-    private static GameRequest Vote(ulong userId, string vote = "yes")
-        => new(Guid.Empty, 7, userId, 8, "unpause", null, vote);
+    private static GameRequest Vote(ulong userId)
+        => new(Guid.Empty, 7, userId, 8, "unpause", null);
 
     private Task<IAdminEvent> HandleRcon(IAdminMessage message, Func<IAdminEvent, bool> match)
     {
