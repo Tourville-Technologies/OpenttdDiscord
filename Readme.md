@@ -37,10 +37,11 @@ Register the dedicated server with `/register-ottd-server` using its encrypted a
 | `/game status` | Shows the registered server's map, game date, players, and live pause state. |
 | `/game profit` | Uses the same quarterly operating profit, scale, dates, and company colours as OpenTTD's Operating Profit graph. Shows all companies in one PNG by default. Pass `company-id` to show one company. |
 | `/game link` | Gives you a private, one-use code to enter in OpenTTD's **All** chat. |
-| `/game my-profit` | Graphs the companies your linked OpenTTD clients are currently playing in. Run `/game link` again when you reconnect. |
-| `/game reset-password` | Clears the password for the company your linked OpenTTD client currently plays in. Specify `company` if your linked clients play in multiple companies. Set a new password in OpenTTD. |
+| `/game my-profit` | Graphs every company linked to your Discord account. Company links remain after the OpenTTD client disconnects. |
+| `/game reset-password` | Clears the password for a company linked to your Discord account, even after the OpenTTD client disconnects. Specify `company` when multiple companies are linked. |
 | `/game unpause` | Opens a five-minute vote after at least one player joins the paused game. React to the vote message with ✅ or ❌; your latest reaction is your ballot. At least four users must vote, and at least 50% of votes cast must be ✅. |
 | `/game-admin start`, `stop`, `restart` | Runs the configured service command on the bot host. |
+| `/game-admin pause`, `unpause` | Immediately pauses or resumes the game without a vote. Unpausing still requires at least one active company player. |
 | `/game-admin admin-role` | Allows the selected Discord role to run `/game-admin` commands. Discord Administrators can always use them. |
 | `/game-admin ping-role` | Saves the Discord role to ping once when a vote opens for this server. Omit `role` to clear it. |
 | `/game-admin clear-password` | Removes an existing human company's password. The company stays in the game, and its players can set a new password in OpenTTD. |
@@ -59,7 +60,7 @@ cmake -S . -B build-discord -DOPTION_DEDICATED=ON
 cmake --build build-discord --parallel
 ```
 
-Set `min_active_clients = 0` in the server's `[network]` configuration so the Discord vote controls resuming after the server empties. Both `pause_on_join = true` and `pause_on_join = false` are supported. With pause-on-join enabled, an approved Discord vote removes the bot's pause while OpenTTD keeps the game paused until connecting clients finish joining. After 15 minutes without an in-game command, chat message, or company move, the patched server moves an inactive company player to spectators without disconnecting them. Spectators do not keep the game running. Camera movement and network keepalives do not count as activity. Zero active company players pauses the game immediately. With only one or two active company players, the server waits 15 minutes, announces a five-minute warning in-game, and pauses if a third active player does not join; reaching three cancels and resets the countdown. Either pause requires the normal Discord vote to resume. Basic status and public chat also work with servers that do not have the patch.
+Set `min_active_clients = 0` in the server's `[network]` configuration so the Discord vote controls resuming after the server empties. Both `pause_on_join = true` and `pause_on_join = false` are supported. With pause-on-join enabled, an approved Discord vote removes the bot's pause while OpenTTD keeps the game paused until connecting clients finish joining. After 15 minutes without an accepted gameplay command, chat message, or company move, the patched server moves an inactive company player to spectators without disconnecting them. Building or removing tiles, tracks, roads, stations, and changing vehicle orders are gameplay commands and reset the inactivity timer. Camera movement and network keepalives do not count as activity. Spectators do not keep the game running. Zero active company players pauses the game immediately. With only one or two active company players, the server waits 15 minutes, announces a five-minute warning in-game, and pauses if a third active player does not join; reaching three cancels and resets the countdown. Either pause requires the normal Discord vote to resume unless an administrator uses `/game-admin unpause`. Basic status and public chat also work with servers that do not have the patch.
 
 ### Start, stop, and restart configuration
 

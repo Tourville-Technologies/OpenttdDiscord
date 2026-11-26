@@ -92,6 +92,11 @@ internal sealed class GameCommandRunner(
                 error => new GameReply(error is HumanReadableError ? error.Reason : "Could not save the unpause vote ping role."));
         }
 
+        if (action is "pause" or "unpause")
+        {
+            action = "admin-" + action;
+        }
+
         var request = new GameRequest(server.Id, server.GuildId, command.User.Id, command.ChannelId!.Value, action, company);
         try
         {

@@ -27,17 +27,17 @@ internal sealed class GameConsole(IAdminPortClient client)
         return lines[0];
     }
 
+    public async Task<string> SetPaused(bool paused)
+    {
+        string command = paused ? "discord_force_pause" : "discord_force_resume";
+        var lines = await Run(command, string.Empty, null);
+        return lines[0];
+    }
+
     public async Task<bool> ClearPassword(int company)
     {
         var lines = await Run("discord_clear_password", " " + company.ToString(CultureInfo.InvariantCulture), null);
         return lines[0] == "cleared";
-    }
-
-    public async Task<string> ClearLinkedCompanyPassword(int company, uint clientId)
-    {
-        string args = FormattableString.Invariant($" {company} {clientId}");
-        var lines = await Run("discord_clear_password", args, null);
-        return lines[0];
     }
 
     private static CompanyProfit ParseCompany(string line)

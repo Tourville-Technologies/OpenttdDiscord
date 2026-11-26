@@ -16,6 +16,7 @@ internal sealed class GameSession(IAdminPortClient client)
     private readonly GameConsole console = new(client);
     private readonly Dictionary<string, (ulong User, DateTimeOffset Expires)> linkCodes = new(StringComparer.Ordinal);
     private readonly Dictionary<uint, ulong> linkedClients = new();
+    private readonly Dictionary<ulong, System.Collections.Generic.HashSet<int>> linkedCompanies = new();
     private readonly Dictionary<ulong, bool> votes = new();
 
     private DateTimeOffset voteEnds;
@@ -25,6 +26,7 @@ internal sealed class GameSession(IAdminPortClient client)
     public void Clear()
     {
         linkedClients.Clear();
+        linkedCompanies.Clear();
         linkCodes.Clear();
         ClearVote();
     }
@@ -32,6 +34,14 @@ internal sealed class GameSession(IAdminPortClient client)
     public void Disconnect(uint clientId)
     {
         linkedClients.Remove(clientId);
+    }
+
+    public void UpdateCompany(Player player)
+    {
+        if (player.PlayingAs < 253 && linkedClients.TryGetValue(player.ClientId, out ulong user))
+        {
+            RememberCompany(user, player.PlayingAs + 1);
+        }
     }
 
     public bool ConsumeLink(AdminChatMessageEvent message)
@@ -47,6 +57,10 @@ internal sealed class GameSession(IAdminPortClient client)
             link.Expires > DateTimeOffset.UtcNow)
         {
             linkedClients[message.Player.ClientId] = link.User;
+            if (message.Player.PlayingAs < 253)
+            {
+                RememberCompany(link.User, message.Player.PlayingAs + 1);
+            }
         }
 
         return true;
@@ -65,6 +79,21 @@ internal sealed class GameSession(IAdminPortClient client)
             return new GameReply(cleared
                 ? $"Password cleared for company #{request.Company}."
                 : $"Company #{request.Company} must be an existing human company.");
+        }
+
+        if (request.Action is "admin-pause" or "admin-unpause")
+        {
+            ClearVote();
+            bool paused = request.Action == "admin-pause";
+            string result = await console.SetPaused(paused);
+            return result switch
+            {
+                "paused" => new GameReply("OpenTTD has been paused by an administrator."),
+                "resumed" => new GameReply("OpenTTD has been unpaused by an administrator."),
+                "empty" => new GameReply("OpenTTD cannot remain unpaused without an active company player."),
+                "blocked" => new GameReply("OpenTTD is paused for another reason that the bot cannot override."),
+                _ => new GameReply("The dedicated server did not accept the administrator pause command."),
+            };
         }
 
         if (request.Action == "reset-password")
@@ -99,8 +128,7 @@ internal sealed class GameSession(IAdminPortClient client)
 
             case "my-profit":
             {
-                var players = await GetLinkedCompanyPlayers(request.UserId);
-                var companies = players.Select(player => player.PlayingAs + 1).ToHashSet();
+                var companies = GetLinkedCompanies(request.UserId);
                 return companies.Count == 0
                     ? new GameReply("Use `/game link` to link your current OpenTTD session, then join a company.")
                     : Profits(snapshot.Companies.Where(company => companies.Contains(company.Id)).ToArray(), snapshot.Year, snapshot.Month);
@@ -115,13 +143,12 @@ internal sealed class GameSession(IAdminPortClient client)
 
     private async Task<GameReply> ResetLinkedCompanyPassword(GameRequest request)
     {
-        var players = await GetLinkedCompanyPlayers(request.UserId);
-        if (players.Length == 0)
+        var companies = GetLinkedCompanies(request.UserId).Order().ToArray();
+        if (companies.Length == 0)
         {
             return new GameReply("Use `/game link` to link your current OpenTTD session, then join a company.");
         }
 
-        var companies = players.Select(player => player.PlayingAs + 1).Distinct().Order().ToArray();
         if (request.Company is null && companies.Length > 1)
         {
             string choices = string.Join(", ", companies.Select(company => $"#{company}"));
@@ -129,27 +156,31 @@ internal sealed class GameSession(IAdminPortClient client)
         }
 
         int companyId = request.Company ?? companies[0];
-        var member = players.FirstOrDefault(player => player.PlayingAs + 1 == companyId);
-        if (member is null)
+        if (!companies.Contains(companyId))
         {
-            return new GameReply($"A linked OpenTTD client must be playing in company #{companyId}.");
+            return new GameReply($"Your Discord account is not linked to company #{companyId}.");
         }
 
-        string result = await console.ClearLinkedCompanyPassword(companyId, member.ClientId);
-        return result switch
-        {
-            "cleared" => new GameReply($"Password cleared for company #{companyId}. You can set a new one in OpenTTD."),
-            "not_in_company" => new GameReply($"A linked OpenTTD client must still be playing in company #{companyId}."),
-            _ => new GameReply($"Company #{companyId} must be an existing human company."),
-        };
+        bool cleared = await console.ClearPassword(companyId);
+        return new GameReply(cleared
+            ? $"Password cleared for company #{companyId}. You can set a new one in OpenTTD."
+            : $"Company #{companyId} must be an existing human company.");
     }
 
-    private async Task<Player[]> GetLinkedCompanyPlayers(ulong userId)
+    private System.Collections.Generic.HashSet<int> GetLinkedCompanies(ulong userId)
     {
-        var status = await client.QueryServerStatus();
-        return status.Players.Values
-            .Where(player => player.PlayingAs < 253 && linkedClients.TryGetValue(player.ClientId, out ulong user) && user == userId)
-            .ToArray();
+        return linkedCompanies.TryGetValue(userId, out var companies) ? companies : new System.Collections.Generic.HashSet<int>();
+    }
+
+    private void RememberCompany(ulong user, int company)
+    {
+        if (!linkedCompanies.TryGetValue(user, out var companies))
+        {
+            companies = new System.Collections.Generic.HashSet<int>();
+            linkedCompanies[user] = companies;
+        }
+
+        companies.Add(company);
     }
 
     private static bool IsPublicChat(AdminChatMessageEvent message)

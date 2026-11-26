@@ -59,11 +59,12 @@ namespace OpenttdDiscord.Infrastructure.Ottd.Actors
             this.getChatChannelUseCase = SP.GetRequiredService<IGetChatChannelUseCase>();
             this.akkaService = SP.GetRequiredService<IAkkaService>();
 
+            string adminAddress = AdminServerAddressResolver.Resolve(server.Ip);
             client = new(new AdminPortClientSettings()
             {
                 WatchdogInterval = TimeSpan.FromSeconds(5),
             },
-            new(server.Ip, server.AdminPort, server.AdminPortPassword),
+            new(adminAddress, server.AdminPort, server.AdminPortPassword),
             logging => logging.AddSerilog());
 
             game = new GameSession(client);
@@ -159,6 +160,11 @@ namespace OpenttdDiscord.Infrastructure.Ottd.Actors
             if (message is AdminClientDisconnectEvent disconnect)
             {
                 game.Disconnect(disconnect.Player.ClientId);
+            }
+
+            if (message is AdminClientUpdateEvent update)
+            {
+                game.UpdateCompany(update.Player);
             }
 
             adminEventSubscribers.TellMany(message);

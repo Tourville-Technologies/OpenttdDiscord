@@ -4,7 +4,7 @@
  
  	static const char *GetClientStatusName(ClientStatus status);
  
-+	std::chrono::steady_clock::time_point last_player_activity{}; ///< Last gameplay or chat input.
++	std::chrono::steady_clock::time_point last_player_activity{}; ///< Last accepted gameplay command, company move, or chat input.
  	uint8_t lag_test = 0;                         ///< Byte used for lag-testing the client
  	uint8_t last_token = 0;                       ///< The last random token we did send to verify the client is listening
  	uint32_t last_token_frame = 0;                ///< The last frame we received the right token
@@ -76,7 +76,7 @@
  #ifndef ENABLE_NETWORK_SYNC_EVERY_FRAME
 --- a/src/network/network_func.h
 +++ b/src/network/network_func.h
-@@ -46,6 +46,10 @@
+@@ -46,6 +46,12 @@
  void NetworkUpdateClientName(const std::string &client_name);
  void NetworkUpdateServerGameType();
  bool NetworkCompanyHasClients(CompanyID company);
@@ -84,12 +84,14 @@
 +uint64_t NetworkDiscordPauseGeneration();
 +std::string_view NetworkDiscordPauseState();
 +std::string_view NetworkDiscordResume(uint64_t generation);
++std::string_view NetworkDiscordForcePause();
++std::string_view NetworkDiscordForceResume();
  std::string NetworkChangeCompanyPassword(CompanyID company_id, std::string password);
  void NetworkReboot();
  void NetworkDisconnect(bool close_admins = true);
 --- a/src/network/network.cpp
 +++ b/src/network/network.cpp
-@@ -552,6 +552,103 @@
+@@ -552,6 +552,130 @@
  	return count;
  }
  
@@ -154,6 +156,33 @@
 +	return "resumed";
 +}
 +
++std::string_view NetworkDiscordForcePause()
++{
++	if (!_network_dedicated) return "unavailable";
++	discord_pause_generation++;
++	discord_waiting_for_vote = true;
++	NetworkDiscordResetLowPopulationTimer();
++	CheckPauseHelper(true, PauseMode::Normal);
++	return "paused";
++}
++
++std::string_view NetworkDiscordForceResume()
++{
++	if (!_network_dedicated) return "unavailable";
++	if (NetworkDiscordClientCount() == 0) return "empty";
++
++	auto other_pauses = _pause_mode;
++	other_pauses.Reset(PauseMode::Normal);
++	other_pauses.Reset(PauseMode::CommandDuringPause);
++	other_pauses.Reset(PauseMode::Join);
++	if (other_pauses.Any()) return "blocked";
++
++	discord_waiting_for_vote = false;
++	NetworkDiscordResetLowPopulationTimer();
++	CheckPauseHelper(false, PauseMode::Normal);
++	return "resumed";
++}
++
 +static void NetworkDiscordCheckPause()
 +{
 +	if (!_network_dedicated) return;
@@ -193,7 +222,7 @@
  /**
   * Check if the minimum number of active clients has been reached and pause or unpause the game as appropriate
   */
-@@ -1075,6 +1172,10 @@
+@@ -1075,6 +1199,10 @@
  	_record_sync_records = false;
  
  	_network_clients_connected = 0;
@@ -204,7 +233,7 @@
  	_network_company_passworded = {};
  
  	NetworkInitGameInfo();
-@@ -1457,6 +1558,7 @@
+@@ -1457,6 +1585,7 @@
  			 * the frame_freq is more than 1 tick. Same with distributing commands. */
  			CheckPauseOnJoin();
  			CheckMinActiveClients();
@@ -222,7 +251,7 @@
  #include "string_func.h"
  #include "strings_func.h"
  #include "viewport_func.h"
-@@ -929,6 +930,66 @@
+@@ -929,6 +930,80 @@
  	return true;
  }
  
@@ -259,6 +288,20 @@
 +	return true;
 +}
 +
++static bool ConDiscordForcePause(std::span<std::string_view> argv)
++{
++	if (argv.size() != 2) return false;
++	IConsolePrint(CC_DEFAULT, "OTTD_DISCORD {} {}", argv[1], NetworkDiscordForcePause());
++	return true;
++}
++
++static bool ConDiscordForceResume(std::span<std::string_view> argv)
++{
++	if (argv.size() != 2) return false;
++	IConsolePrint(CC_DEFAULT, "OTTD_DISCORD {} {}", argv[1], NetworkDiscordForceResume());
++	return true;
++}
++
 +static bool ConDiscordClearPassword(std::span<std::string_view> argv)
 +{
 +	if (argv.size() != 3 && argv.size() != 4) return false;
@@ -289,12 +332,14 @@
  /** Manually pause the game. @copydoc IConsoleCmdProc */
  static bool ConPauseGame(std::span<std::string_view> argv)
  {
-@@ -4578,6 +4639,9 @@
+@@ -4578,6 +4653,11 @@
  
  	IConsole::CmdRegister("connect",                 ConNetworkConnect,   ConHookClientOnly);
  	IConsole::CmdRegister("clients",                 ConNetworkClients,   ConHookNeedNetwork);
 +	IConsole::CmdRegister("discord_snapshot",        ConDiscordSnapshot,   ConHookServerOnly);
 +	IConsole::CmdRegister("discord_resume",          ConDiscordResume,     ConHookServerOnly);
++	IConsole::CmdRegister("discord_force_pause",     ConDiscordForcePause, ConHookServerOnly);
++	IConsole::CmdRegister("discord_force_resume",    ConDiscordForceResume, ConHookServerOnly);
 +	IConsole::CmdRegister("discord_clear_password",  ConDiscordClearPassword, ConHookServerOnly);
  	IConsole::CmdRegister("status",                  ConStatus,           ConHookServerOnly);
  	IConsole::CmdRegister("server_info",             ConServerInfo,       ConHookServerOnly);

@@ -13,6 +13,8 @@ internal sealed class GameCommand(bool admin) : OttdSlashCommandBase<GameCommand
                 .AddOption(Subcommand("start", "Start the configured OpenTTD service"))
                 .AddOption(Subcommand("stop", "Stop the configured OpenTTD service"))
                 .AddOption(Subcommand("restart", "Restart the configured OpenTTD service"))
+                .AddOption(Subcommand("pause", "Pause the game immediately without a vote"))
+                .AddOption(Subcommand("unpause", "Unpause the game immediately without a vote"))
                 .AddOption(Subcommand("clear-password", "Remove a company's password").AddOption(CompanyOption(true)))
                 .AddOption(Subcommand("admin-role", "Allow a Discord role to use game administration commands")
                     .AddOption("role", ApplicationCommandOptionType.Role, "Role allowed to administer the game.", isRequired: true))

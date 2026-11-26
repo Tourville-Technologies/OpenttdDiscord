@@ -14,9 +14,9 @@ public class GameSessionShould
     private readonly IAdminPortClient client = Substitute.For<IAdminPortClient>();
     private readonly GameSession session;
     private readonly List<string> passwordRequests = new();
+    private readonly List<string> pauseRequests = new();
     private ulong generation = 1;
     private int resumes;
-    private string resetResult = "cleared";
 
     public GameSessionShould()
     {
@@ -137,7 +137,7 @@ public class GameSessionShould
     }
 
     [Fact]
-    public async Task ShowOnlyTheLinkedClientsCurrentCompany()
+    public async Task RetainTheLinkedCompanyWhenTheClientDisconnects()
     {
         var player = new Player(42, "Player", "localhost", 2, DateTimeOffset.UtcNow);
         var players = new Dictionary<uint, Player> { [player.ClientId] = player };
@@ -152,7 +152,8 @@ public class GameSessionShould
 
         session.Disconnect(player.ClientId);
         var afterDisconnect = await session.Execute(user with { Action = "my-profit" });
-        Assert.Null(afterDisconnect.Profits);
+        var retained = Assert.Single(afterDisconnect.Profits!);
+        Assert.Equal(3, retained.Id);
     }
 
     [Fact]
@@ -166,7 +167,7 @@ public class GameSessionShould
         var result = await session.Execute(user with { Action = "reset-password" });
 
         Assert.Contains("Password cleared for company #3", result.Text);
-        Assert.EndsWith(" 3 42", Assert.Single(passwordRequests));
+        Assert.EndsWith(" 3", Assert.Single(passwordRequests));
     }
 
     [Fact]
@@ -181,23 +182,35 @@ public class GameSessionShould
         var wrongCompany = await session.Execute(user with { Action = "reset-password", Company = 4 });
 
         Assert.Contains("/game link", stranger.Text);
-        Assert.Contains("must be playing in company #4", wrongCompany.Text);
+        Assert.Contains("not linked to company #4", wrongCompany.Text);
         Assert.Empty(passwordRequests);
     }
 
     [Fact]
-    public async Task ReportACompanyChangeDetectedByTheGameServer()
+    public async Task RetainCompaniesJoinedAfterLinking()
     {
         var player = new Player(42, "Player", "localhost", 2, DateTimeOffset.UtcNow);
-        client.QueryServerStatus().Returns(new ServerStatus(null!, new Dictionary<uint, Player> { [player.ClientId] = player }));
         var user = Vote(1);
         await LinkPlayer(user, player);
-        resetResult = "not_in_company";
+        session.UpdateCompany(player with { PlayingAs = 3 });
+        session.Disconnect(player.ClientId);
 
-        var result = await session.Execute(user with { Action = "reset-password" });
+        var result = await session.Execute(user with { Action = "my-profit" });
 
-        Assert.Contains("must still be playing in company #3", result.Text);
-        Assert.EndsWith(" 3 42", Assert.Single(passwordRequests));
+        Assert.Equal(new[] { 3, 4 }, result.Profits!.Select(company => company.Id));
+    }
+
+    [Fact]
+    public async Task LetAdministratorsPauseAndUnpauseWithoutAVote()
+    {
+        var request = Vote(1);
+
+        var paused = await session.Execute(request with { Action = "admin-pause" });
+        var resumed = await session.Execute(request with { Action = "admin-unpause" });
+
+        Assert.Contains("paused by an administrator", paused.Text);
+        Assert.Contains("unpaused by an administrator", resumed.Text);
+        Assert.Equal(new[] { "discord_force_pause", "discord_force_resume" }, pauseRequests);
     }
 
     private async Task LinkPlayer(GameRequest user, Player player)
@@ -228,7 +241,15 @@ public class GameSessionShould
         if (command[0] == "discord_clear_password")
         {
             passwordRequests.Add(((AdminRconMessage)message).Command);
-            var result = new AdminRconEvent(prefix + resetResult);
+            var result = new AdminRconEvent(prefix + "cleared");
+            Assert.True(match(result));
+            return Task.FromResult<IAdminEvent>(result);
+        }
+
+        if (command[0] is "discord_force_pause" or "discord_force_resume")
+        {
+            pauseRequests.Add(command[0]);
+            var result = new AdminRconEvent(prefix + (command[0] == "discord_force_pause" ? "paused" : "resumed"));
             Assert.True(match(result));
             return Task.FromResult<IAdminEvent>(result);
         }
