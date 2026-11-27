@@ -76,7 +76,7 @@
  #ifndef ENABLE_NETWORK_SYNC_EVERY_FRAME
 --- a/src/network/network_func.h
 +++ b/src/network/network_func.h
-@@ -46,6 +46,12 @@
+@@ -46,6 +46,14 @@
  void NetworkUpdateClientName(const std::string &client_name);
  void NetworkUpdateServerGameType();
  bool NetworkCompanyHasClients(CompanyID company);
@@ -86,18 +86,21 @@
 +std::string_view NetworkDiscordResume(uint64_t generation);
 +std::string_view NetworkDiscordForcePause();
 +std::string_view NetworkDiscordForceResume();
++std::string_view NetworkDiscordSoftPause();
++std::string NetworkDiscordPauseStatus();
  std::string NetworkChangeCompanyPassword(CompanyID company_id, std::string password);
  void NetworkReboot();
  void NetworkDisconnect(bool close_admins = true);
 --- a/src/network/network.cpp
 +++ b/src/network/network.cpp
-@@ -552,6 +552,130 @@
+@@ -552,6 +552,188 @@
  	return count;
  }
  
 +/* The dedicated server stays paused after the first player returns until Discord approves a resume. */
 +static bool discord_waiting_for_vote = true;
 +static bool discord_had_clients = false;
++static bool discord_admin_prevents_pause = false;
 +static uint64_t discord_pause_generation = 0;
 +static std::chrono::steady_clock::time_point discord_low_population_since{};
 +static std::chrono::steady_clock::time_point discord_low_population_warning_at{};
@@ -151,6 +154,7 @@
 +	if (other_pauses.Any()) return "blocked";
 +
 +	discord_waiting_for_vote = false;
++	discord_admin_prevents_pause = false;
 +	NetworkDiscordResetLowPopulationTimer();
 +	CheckPauseHelper(false, PauseMode::Normal);
 +	return "resumed";
@@ -161,6 +165,7 @@
 +	if (!_network_dedicated) return "unavailable";
 +	discord_pause_generation++;
 +	discord_waiting_for_vote = true;
++	discord_admin_prevents_pause = false;
 +	NetworkDiscordResetLowPopulationTimer();
 +	CheckPauseHelper(true, PauseMode::Normal);
 +	return "paused";
@@ -178,9 +183,61 @@
 +	if (other_pauses.Any()) return "blocked";
 +
 +	discord_waiting_for_vote = false;
++	discord_admin_prevents_pause = true;
 +	NetworkDiscordResetLowPopulationTimer();
 +	CheckPauseHelper(false, PauseMode::Normal);
 +	return "resumed";
++}
++
++std::string_view NetworkDiscordSoftPause()
++{
++	if (!_network_dedicated) return "unavailable";
++	discord_admin_prevents_pause = false;
++	NetworkDiscordResetLowPopulationTimer();
++	return "normal";
++}
++
++std::string NetworkDiscordPauseStatus()
++{
++	const auto now = std::chrono::steady_clock::now();
++	const uint active_clients = NetworkDiscordClientCount();
++	std::string low_population;
++	if (discord_waiting_for_vote) {
++		low_population = "locked pending a Discord vote";
++	} else if (discord_admin_prevents_pause) {
++		low_population = "suppressed by administrative unpause";
++	} else if (active_clients >= 3) {
++		low_population = "inactive (3+ active players)";
++	} else if (discord_low_population_warning_at != std::chrono::steady_clock::time_point{}) {
++		int64_t remaining = std::chrono::duration_cast<std::chrono::seconds>(discord_low_population_warning_at + std::chrono::minutes(5) - now).count();
++		if (remaining < 0) remaining = 0;
++		low_population = fmt::format("warning issued ({} seconds until pause)", remaining);
++	} else if (discord_low_population_since != std::chrono::steady_clock::time_point{}) {
++		int64_t remaining = std::chrono::duration_cast<std::chrono::seconds>(discord_low_population_since + std::chrono::minutes(15) - now).count();
++		if (remaining < 0) remaining = 0;
++		low_population = fmt::format("timer running ({} seconds until warning)", remaining);
++	} else {
++		low_population = "starting";
++	}
++
++	std::string locks;
++	auto add_lock = [&locks](std::string_view name) {
++		if (!locks.empty()) locks += ", ";
++		locks.append(name);
++	};
++	if (_pause_mode.Test(PauseMode::Normal)) add_lock("normal/Discord");
++	if (_pause_mode.Test(PauseMode::SaveLoad)) add_lock("save/load");
++	if (_pause_mode.Test(PauseMode::Join)) add_lock("joining clients");
++	if (_pause_mode.Test(PauseMode::Error)) add_lock("critical error");
++	if (_pause_mode.Test(PauseMode::ActiveClients)) add_lock("minimum active clients");
++	if (_pause_mode.Test(PauseMode::GameScript)) add_lock("game script");
++	if (_pause_mode.Test(PauseMode::LinkGraph)) add_lock("link graph");
++	if (_pause_mode.Test(PauseMode::CommandDuringPause)) add_lock("command during pause");
++	if (locks.empty()) locks = "none";
++
++	return fmt::format("State: {}|Active company players: {}|Pause generation: {}|Vote lock: {}|Administrative unpause override: {}|Low-population control: {}|OpenTTD pause locks: {}",
++		NetworkDiscordPauseState(), active_clients, discord_pause_generation, discord_waiting_for_vote ? "on" : "off",
++		discord_admin_prevents_pause ? "on" : "off", low_population, locks);
 +}
 +
 +static void NetworkDiscordCheckPause()
@@ -193,6 +250,9 @@
 +	if (active_clients == 0) {
 +		if (discord_had_clients) discord_pause_generation++;
 +		discord_waiting_for_vote = true;
++		discord_admin_prevents_pause = false;
++		NetworkDiscordResetLowPopulationTimer();
++	} else if (discord_admin_prevents_pause) {
 +		NetworkDiscordResetLowPopulationTimer();
 +	} else if (!discord_waiting_for_vote && active_clients >= 3) {
 +		if (discord_low_population_warning_at != std::chrono::steady_clock::time_point{}) {
@@ -222,18 +282,19 @@
  /**
   * Check if the minimum number of active clients has been reached and pause or unpause the game as appropriate
   */
-@@ -1075,6 +1199,10 @@
+@@ -1075,6 +1257,11 @@
  	_record_sync_records = false;
  
  	_network_clients_connected = 0;
 +	discord_waiting_for_vote = true;
 +	discord_had_clients = false;
++	discord_admin_prevents_pause = false;
 +	discord_pause_generation++;
 +	NetworkDiscordResetLowPopulationTimer();
  	_network_company_passworded = {};
  
  	NetworkInitGameInfo();
-@@ -1457,6 +1585,7 @@
+@@ -1457,6 +1644,7 @@
  			 * the frame_freq is more than 1 tick. Same with distributing commands. */
  			CheckPauseOnJoin();
  			CheckMinActiveClients();
@@ -251,7 +312,7 @@
  #include "string_func.h"
  #include "strings_func.h"
  #include "viewport_func.h"
-@@ -929,6 +930,80 @@
+@@ -929,6 +930,101 @@
  	return true;
  }
  
@@ -260,8 +321,15 @@
 +{
 +	if (argv.size() != 2 && (argv.size() != 3 || argv[2] != "state")) return false;
 +
-+	IConsolePrint(CC_DEFAULT, "OTTD_DISCORD {} state {} {} {} {} {}", argv[1], NetworkDiscordPauseState(), NetworkDiscordClientCount(),
-+		NetworkDiscordPauseGeneration(), EconTime::CurYear().base(), EconTime::CurMonth());
++	EconTime::Year next_quarter_year = EconTime::CurYear();
++	EconTime::Month next_quarter_month = ((EconTime::CurMonth() / 3) + 1) * 3;
++	if (next_quarter_month >= 12) {
++		next_quarter_month = 0;
++		next_quarter_year = EconTime::Year{next_quarter_year.base() + 1};
++	}
++	const int days_to_next_quarter = (EconTime::ConvertYMDToDate(next_quarter_year, next_quarter_month, 1) - EconTime::CurDate()).base();
++	IConsolePrint(CC_DEFAULT, "OTTD_DISCORD {} state {} {} {} {} {} {} {}", argv[1], NetworkDiscordPauseState(), NetworkDiscordClientCount(),
++		NetworkDiscordPauseGeneration(), EconTime::CurYear().base(), EconTime::CurMonth(), EconTime::CurDay(), days_to_next_quarter);
 +	if (argv.size() == 2) {
 +		for (const Company *c : Company::Iterate()) {
 +			fmt::memory_buffer profits;
@@ -302,6 +370,20 @@
 +	return true;
 +}
 +
++static bool ConDiscordSoftPause(std::span<std::string_view> argv)
++{
++	if (argv.size() != 2) return false;
++	IConsolePrint(CC_DEFAULT, "OTTD_DISCORD {} {}", argv[1], NetworkDiscordSoftPause());
++	return true;
++}
++
++static bool ConDiscordPauseStatus(std::span<std::string_view> argv)
++{
++	if (argv.size() != 2) return false;
++	IConsolePrint(CC_DEFAULT, "OTTD_DISCORD {} {}", argv[1], NetworkDiscordPauseStatus());
++	return true;
++}
++
 +static bool ConDiscordClearPassword(std::span<std::string_view> argv)
 +{
 +	if (argv.size() != 3 && argv.size() != 4) return false;
@@ -332,7 +414,7 @@
  /** Manually pause the game. @copydoc IConsoleCmdProc */
  static bool ConPauseGame(std::span<std::string_view> argv)
  {
-@@ -4578,6 +4653,11 @@
+@@ -4578,6 +4674,13 @@
  
  	IConsole::CmdRegister("connect",                 ConNetworkConnect,   ConHookClientOnly);
  	IConsole::CmdRegister("clients",                 ConNetworkClients,   ConHookNeedNetwork);
@@ -340,6 +422,8 @@
 +	IConsole::CmdRegister("discord_resume",          ConDiscordResume,     ConHookServerOnly);
 +	IConsole::CmdRegister("discord_force_pause",     ConDiscordForcePause, ConHookServerOnly);
 +	IConsole::CmdRegister("discord_force_resume",    ConDiscordForceResume, ConHookServerOnly);
++	IConsole::CmdRegister("discord_soft_pause",      ConDiscordSoftPause, ConHookServerOnly);
++	IConsole::CmdRegister("discord_pause_status",    ConDiscordPauseStatus, ConHookServerOnly);
 +	IConsole::CmdRegister("discord_clear_password",  ConDiscordClearPassword, ConHookServerOnly);
  	IConsole::CmdRegister("status",                  ConStatus,           ConHookServerOnly);
  	IConsole::CmdRegister("server_info",             ConServerInfo,       ConHookServerOnly);

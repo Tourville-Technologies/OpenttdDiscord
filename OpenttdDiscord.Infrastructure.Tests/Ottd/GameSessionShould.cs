@@ -118,6 +118,19 @@ public class GameSessionShould
         Assert.Equal(new long[] { 100, -45 }, company.Quarters);
         Assert.Null(missing.Profits);
         Assert.Contains("No matching companies", missing.Text);
+        Assert.Contains("2026-11-26", all.Text);
+        Assert.Contains("Q4, month 2 of 3, day 26", all.Text);
+        Assert.Contains("36 in-game days until Q1", all.Text);
+    }
+
+    [Fact]
+    public async Task ShowTheCurrentGameDateAndQuarterProgress()
+    {
+        var result = await session.Execute(Vote(1) with { Action = "get-date" });
+
+        Assert.Contains("2026-11-26", result.Text);
+        Assert.Contains("Q4, month 2 of 3, day 26", result.Text);
+        Assert.Contains("36 in-game days until Q1", result.Text);
     }
 
     [Fact]
@@ -213,6 +226,26 @@ public class GameSessionShould
         Assert.Equal(new[] { "discord_force_pause", "discord_force_resume" }, pauseRequests);
     }
 
+    [Fact]
+    public async Task LetAdministratorsRestoreAutomaticPopulationPausing()
+    {
+        var result = await session.Execute(Vote(1) with { Action = "admin-softpause" });
+
+        Assert.Contains("Automatic population-based pausing has been restored", result.Text);
+        Assert.Equal(new[] { "discord_soft_pause" }, pauseRequests);
+    }
+
+    [Fact]
+    public async Task ShowAdministratorsThePauseSystemStatus()
+    {
+        var result = await session.Execute(Vote(1) with { Action = "admin-pausestatus" });
+
+        Assert.Contains("Pause system status", result.Text);
+        Assert.Contains("Vote lock: off", result.Text);
+        Assert.Contains("OpenTTD pause locks: none", result.Text);
+        Assert.Equal(new[] { "discord_pause_status" }, pauseRequests);
+    }
+
     private async Task LinkPlayer(GameRequest user, Player player)
     {
         var link = await session.Execute(user with { Action = "link" });
@@ -246,16 +279,23 @@ public class GameSessionShould
             return Task.FromResult<IAdminEvent>(result);
         }
 
-        if (command[0] is "discord_force_pause" or "discord_force_resume")
+        if (command[0] is "discord_force_pause" or "discord_force_resume" or "discord_soft_pause" or "discord_pause_status")
         {
             pauseRequests.Add(command[0]);
-            var result = new AdminRconEvent(prefix + (command[0] == "discord_force_pause" ? "paused" : "resumed"));
+            string response = command[0] switch
+            {
+                "discord_force_pause" => "paused",
+                "discord_force_resume" => "resumed",
+                "discord_soft_pause" => "normal",
+                _ => "State: running|Active company players: 3|Vote lock: off|Administrative unpause override: off|Low-population control: inactive (3+ active players)|OpenTTD pause locks: none",
+            };
+            var result = new AdminRconEvent(prefix + response);
             Assert.True(match(result));
             return Task.FromResult<IAdminEvent>(result);
         }
 
         Assert.False(match(new AdminRconEvent("OTTD_DISCORD unrelated end")));
-        Assert.False(match(new AdminRconEvent(prefix + $"state vote 1 {generation}")));
+        Assert.False(match(new AdminRconEvent(prefix + $"state vote 1 {generation} 2026 10 26 36")));
         if (command.Length == 2)
         {
             Assert.False(match(new AdminRconEvent(prefix + "company 3|100,-45|Rail & Road")));

@@ -15,6 +15,8 @@ internal sealed class GameCommand(bool admin) : OttdSlashCommandBase<GameCommand
                 .AddOption(Subcommand("restart", "Restart the configured OpenTTD service"))
                 .AddOption(Subcommand("pause", "Pause the game immediately without a vote"))
                 .AddOption(Subcommand("unpause", "Unpause the game immediately without a vote"))
+                .AddOption(Subcommand("softpause", "Restore automatic population-based pausing"))
+                .AddOption(Subcommand("pausestatus", "Show the pause state, timers, overrides, and locks"))
                 .AddOption(Subcommand("clear-password", "Remove a company's password").AddOption(CompanyOption(true)))
                 .AddOption(Subcommand("admin-role", "Allow a Discord role to use game administration commands")
                     .AddOption("role", ApplicationCommandOptionType.Role, "Role allowed to administer the game.", isRequired: true))
@@ -25,6 +27,7 @@ internal sealed class GameCommand(bool admin) : OttdSlashCommandBase<GameCommand
 
         builder.WithDescription("View and resume an OpenTTD game")
             .AddOption(Subcommand("status", "View the current game and its connected players"))
+            .AddOption(Subcommand("get-date", "Show the current in-game date and quarter progress"))
             .AddOption(Subcommand("profit", "Show the operating-profit graph for all companies or a selected company")
                 .AddOption(CompanyOption(false, "company-id")))
             .AddOption(Subcommand("my-profit", "Get the profit graphs for companies your linked clients play in"))

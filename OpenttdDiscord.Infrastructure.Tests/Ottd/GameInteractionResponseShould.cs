@@ -5,6 +5,26 @@ namespace OpenttdDiscord.Infrastructure.Tests.Ottd;
 
 public class GameInteractionResponseShould
 {
+    [Fact]
+    public void PublishAdministratorPauseCommands()
+    {
+        var command = new GameCommand(admin: true).Build();
+        var optionNames = command.Options.Value.Select(option => option.Name);
+
+        Assert.Contains("pause", optionNames);
+        Assert.Contains("unpause", optionNames);
+        Assert.Contains("softpause", optionNames);
+        Assert.Contains("pausestatus", optionNames);
+    }
+
+    [Fact]
+    public void PublishGameDateCommand()
+    {
+        var command = new GameCommand(admin: false).Build();
+
+        Assert.Contains("get-date", command.Options.Value.Select(option => option.Name));
+    }
+
     [Theory]
     [InlineData("game", "status", false)]
     [InlineData("game", "profit", false)]
@@ -16,6 +36,18 @@ public class GameInteractionResponseShould
     public void ShowOnlySensitiveCommandResponsesToTheRunningUser(string command, string action, bool expected)
     {
         Assert.Equal(expected, GameCommandRunner.IsEphemeral(command, action));
+    }
+
+    [Theory]
+    [InlineData("game", "unpause", "unpause")]
+    [InlineData("game-admin", "unpause", "admin-unpause")]
+    [InlineData("game-admin", "pause", "admin-pause")]
+    [InlineData("game-admin", "softpause", "admin-softpause")]
+    [InlineData("game-admin", "pausestatus", "admin-pausestatus")]
+    [InlineData("game-admin", "restart", "restart")]
+    public void OnlyRouteAdministratorPauseCommandsAroundVoting(string command, string action, string expected)
+    {
+        Assert.Equal(expected, GameCommandRunner.NormalizeAction(command, action));
     }
 
     [Fact]

@@ -9,7 +9,7 @@ internal sealed class GameConsole(IAdminPortClient client)
 {
     public const string ReplyPrefix = "OTTD_DISCORD ";
 
-    public async Task<(string State, int Clients, ulong Generation, int Year, int Month, IReadOnlyList<CompanyProfit> Companies)> Snapshot(bool includeCompanies)
+    public async Task<(string State, int Clients, ulong Generation, int Year, int Month, int Day, int DaysToNextQuarter, IReadOnlyList<CompanyProfit> Companies)> Snapshot(bool includeCompanies)
     {
         var lines = await Run("discord_snapshot", includeCompanies ? string.Empty : " state", "end");
         string[] state = lines[0].Split(' ');
@@ -17,8 +17,10 @@ internal sealed class GameConsole(IAdminPortClient client)
         ulong generation = ulong.Parse(state[3], CultureInfo.InvariantCulture);
         int year = state.Length > 4 ? int.Parse(state[4], CultureInfo.InvariantCulture) : 0;
         int month = state.Length > 5 ? int.Parse(state[5], CultureInfo.InvariantCulture) : 0;
+        int day = state.Length > 6 ? int.Parse(state[6], CultureInfo.InvariantCulture) : 1;
+        int daysToNextQuarter = state.Length > 7 ? int.Parse(state[7], CultureInfo.InvariantCulture) : 0;
         var companies = lines.Skip(1).SkipLast(1).Select(ParseCompany).ToArray();
-        return (state[1], players, generation, year, month, companies);
+        return (state[1], players, generation, year, month, day, daysToNextQuarter, companies);
     }
 
     public async Task<string> Resume(ulong generation)
@@ -31,6 +33,18 @@ internal sealed class GameConsole(IAdminPortClient client)
     {
         string command = paused ? "discord_force_pause" : "discord_force_resume";
         var lines = await Run(command, string.Empty, null);
+        return lines[0];
+    }
+
+    public async Task<string> RestoreAutomaticPause()
+    {
+        var lines = await Run("discord_soft_pause", string.Empty, null);
+        return lines[0];
+    }
+
+    public async Task<string> PauseStatus()
+    {
+        var lines = await Run("discord_pause_status", string.Empty, null);
         return lines[0];
     }
 

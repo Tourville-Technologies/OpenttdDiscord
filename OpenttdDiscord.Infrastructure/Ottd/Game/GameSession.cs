@@ -96,6 +96,21 @@ internal sealed class GameSession(IAdminPortClient client)
             };
         }
 
+        if (request.Action == "admin-softpause")
+        {
+            ClearVote();
+            string result = await console.RestoreAutomaticPause();
+            return new GameReply(result == "normal"
+                ? "Automatic population-based pausing has been restored. The low-population timer will start when fewer than three active players are connected."
+                : "The dedicated server did not accept the soft-pause command.");
+        }
+
+        if (request.Action == "admin-pausestatus")
+        {
+            string result = await console.PauseStatus();
+            return new GameReply("**Pause system status**\n" + string.Join('\n', result.Split('|')));
+        }
+
         if (request.Action == "reset-password")
         {
             return await ResetLinkedCompanyPassword(request);
@@ -119,11 +134,17 @@ internal sealed class GameSession(IAdminPortClient client)
                 return OpenVote(snapshot.State, snapshot.Clients, snapshot.Generation);
             }
 
+            case "get-date":
+            {
+                return new GameReply("Current in-game date: **" + FormatGameDate(snapshot.Year, snapshot.Month, snapshot.Day) + "** · " +
+                    FormatQuarterProgress(snapshot.Month, snapshot.Day, snapshot.DaysToNextQuarter));
+            }
+
             case "profit":
             {
                 return request.Company is { } companyId
-                    ? Profits(snapshot.Companies.Where(company => company.Id == companyId).ToArray(), snapshot.Year, snapshot.Month)
-                    : Profits(snapshot.Companies, snapshot.Year, snapshot.Month);
+                    ? Profits(snapshot.Companies.Where(company => company.Id == companyId).ToArray(), snapshot.Year, snapshot.Month, snapshot.Day, snapshot.DaysToNextQuarter)
+                    : Profits(snapshot.Companies, snapshot.Year, snapshot.Month, snapshot.Day, snapshot.DaysToNextQuarter);
             }
 
             case "my-profit":
@@ -131,7 +152,7 @@ internal sealed class GameSession(IAdminPortClient client)
                 var companies = GetLinkedCompanies(request.UserId);
                 return companies.Count == 0
                     ? new GameReply("Use `/game link` to link your current OpenTTD session, then join a company.")
-                    : Profits(snapshot.Companies.Where(company => companies.Contains(company.Id)).ToArray(), snapshot.Year, snapshot.Month);
+                    : Profits(snapshot.Companies.Where(company => companies.Contains(company.Id)).ToArray(), snapshot.Year, snapshot.Month, snapshot.Day, snapshot.DaysToNextQuarter);
             }
 
             default:
@@ -315,15 +336,28 @@ internal sealed class GameSession(IAdminPortClient client)
         votes.Clear();
     }
 
-    private static GameReply Profits(IReadOnlyList<CompanyProfit> companies, int year, int month)
+    private static GameReply Profits(IReadOnlyList<CompanyProfit> companies, int year, int month, int day, int daysToNextQuarter)
     {
         return companies.Count == 0
             ? new GameReply("No matching companies are available.")
-            : new GameReply("Operating profit by completed quarter, in OpenTTD base currency.")
+            : new GameReply("Operating profit by completed quarter, in OpenTTD base currency. " + FormatGameDate(year, month, day) +
+                " · " + FormatQuarterProgress(month, day, daysToNextQuarter))
             {
                 Profits = companies,
                 ProfitYear = year,
                 ProfitMonth = month,
             };
+    }
+
+    private static string FormatGameDate(int year, int month, int day)
+        => $"{year:D4}-{month + 1:D2}-{day:D2}";
+
+    private static string FormatQuarterProgress(int month, int day, int daysToNextQuarter)
+    {
+        int quarter = (month / 3) + 1;
+        int nextQuarter = (quarter % 4) + 1;
+        int monthInQuarter = (month % 3) + 1;
+        string days = daysToNextQuarter == 1 ? "1 in-game day" : $"{daysToNextQuarter} in-game days";
+        return $"Q{quarter}, month {monthInQuarter} of 3, day {day} · {days} until Q{nextQuarter}";
     }
 }

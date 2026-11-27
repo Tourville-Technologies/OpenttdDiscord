@@ -49,7 +49,8 @@ internal sealed class GameCommandRunner(
 
     private async Task<GameReply> RunOnServer(ISlashCommandInteraction command, string action, int? company, IRole? role)
     {
-        if (command.Data.Name == "game-admin")
+        bool adminCommand = command.Data.Name == "game-admin";
+        if (adminCommand)
         {
             var level = await roleLevels.Execute(command.User);
             bool allowed = level.Match(value => value == UserLevel.Admin, _ => false);
@@ -92,10 +93,7 @@ internal sealed class GameCommandRunner(
                 error => new GameReply(error is HumanReadableError ? error.Reason : "Could not save the unpause vote ping role."));
         }
 
-        if (action is "pause" or "unpause")
-        {
-            action = "admin-" + action;
-        }
+        action = NormalizeAction(command.Data.Name, action);
 
         var request = new GameRequest(server.Id, server.GuildId, command.User.Id, command.ChannelId!.Value, action, company);
         try
@@ -117,4 +115,7 @@ internal sealed class GameCommandRunner(
             return new GameReply("The bot could not reach the registered OpenTTD server. Try again after it reconnects.");
         }
     }
+
+    internal static string NormalizeAction(string commandName, string action)
+        => commandName == "game-admin" && action is "pause" or "unpause" or "softpause" or "pausestatus" ? "admin-" + action : action;
 }

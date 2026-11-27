@@ -56,61 +56,29 @@ namespace OpenttdDiscord.Infrastructure.Discord
         public async Task Register()
         {
             await RegisterCommands();
-            await PruneCommands();
-        }
-
-        private async Task PruneCommands()
-        {
-            var existingCommands = await client.GetGlobalApplicationCommandsAsync();
-
-            foreach (var c in existingCommands)
-            {
-                string name = c.Name;
-                if (commands.ContainsKey(name))
-                {
-                    continue;
-                }
-
-                logger.LogInformation($"Removing dangling command {name}");
-                await c.DeleteAsync();
-                logger.LogInformation($"{name} deleted!");
-            }
         }
 
         private async Task RegisterCommands()
         {
-            var existingCommands = (await client.GetGlobalApplicationCommandsAsync())
-                .ToDictionary(x => x.Name);
-
-            foreach (var c in commands.Values)
+            var configuredCommands = commands.Values.Select(command => command.Build()).ToArray();
+            var existingCommands = await client.GetGlobalApplicationCommandsAsync();
+            bool commandsMatch = configuredCommands.Length == existingCommands.Count && configuredCommands.All(configured =>
             {
-                var props = c.Build();
+                var existing = existingCommands.SingleOrDefault(command => command.Name == configured.Name.Value);
+                var configuredOptions = configured.Options.IsSpecified
+                    ? configured.Options.Value
+                    : Enumerable.Empty<ApplicationCommandOptionProperties>();
+                return existing is not null && OptionsMatch(configuredOptions, existing.Options);
+            });
 
-                if (existingCommands.TryGetValue(c.Name, out var existing))
-                {
-                    var configuredOptions = props.Options.IsSpecified ? props.Options.Value : Enumerable.Empty<ApplicationCommandOptionProperties>();
-                    if (OptionsMatch(configuredOptions, existing.Options))
-                    {
-                        continue;
-                    }
-
-                    await existing.DeleteAsync();
-                    logger.LogInformation("Re-registering {Command} with updated options", c.Name);
-                }
-
-                try
-                {
-                    logger.LogInformation($"Registering {c}");
-                    await client.CreateGlobalApplicationCommandAsync(props);
-                    logger.LogInformation($"Registered {c}");
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(
-                        ex,
-                        $"Something when wrong while registering {c}");
-                }
+            if (commandsMatch)
+            {
+                return;
             }
+
+            logger.LogInformation("Synchronizing {CommandCount} global slash commands", configuredCommands.Length);
+            await client.BulkOverwriteGlobalApplicationCommandsAsync(configuredCommands);
+            logger.LogInformation("Global slash commands synchronized");
         }
 
         private static bool OptionsMatch(IEnumerable<ApplicationCommandOptionProperties> configured, IEnumerable<IApplicationCommandOption> registered)
